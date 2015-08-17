@@ -281,6 +281,11 @@ export class EventEmitterAccessor {
 
   subscribe(view: viewModule.AppView, boundElementIndex: number, directive: Object): Object {
     var eventEmitter = this.getter(directive);
+
+    if (!isPresent(eventEmitter)) {
+      throw new BaseException(`Can't find EventEmitter for the '${this.eventName}' event`);
+    }
+
     return ObservableWrapper.subscribe<Event>(
         eventEmitter,
         eventObj => view.triggerEventHandlers(this.eventName, eventObj, boundElementIndex));

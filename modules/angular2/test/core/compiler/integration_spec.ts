@@ -1298,6 +1298,20 @@ export function main() {
            });
          }));
 
+      iit('should throw descriptive error when event declared but no EventEmitter found',
+        inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async) => {
+          tcb = tcb.overrideView(MyComp, new viewAnn.View({
+            template: '<div emitter-no-event-emitter></div>',
+            directives: [DirectiveEmittingEventNoEventEmitter]
+          }));
+
+          PromiseWrapper.catchError(tcb.createAsync(MyComp), (e) => {
+            expect(e.message).toEqual(`Can't find EventEmitter for the 'foo' event`);
+            async.done();
+            return null;
+          });
+        }));
+
       if (DOM.supportsDOMEvents()) {  // this is required to use fakeAsync
         it('should provide an error context when an error happens in an event handler',
            inject([TestComponentBuilder], fakeAsync((tcb: TestComponentBuilder) => {
@@ -1778,6 +1792,13 @@ class DirectiveEmitingEvent {
   }
 
   fireEvent(msg: string) { ObservableWrapper.callNext(this.event, msg); }
+}
+
+@Directive({selector: '[emitter-no-event-emitter]', events: ['foo']})
+@Injectable()
+class DirectiveEmittingEventNoEventEmitter {
+  constructor() {
+  }
 }
 
 @Directive({selector: '[update-host-attributes]', host: {'role': 'button'}})
