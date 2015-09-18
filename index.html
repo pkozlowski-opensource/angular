@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <script>
+    function assertEqual(arg1, arg2) {
+      if (!(arg1===arg2)) {
+        throw new Error('Expected ' + arg1 + ' to equal ' + arg2);
+      }
+    }
+
+    function Class(TypeDef) {
+      TypeDef.reflectAnnotations = this.annotations;
+      return TypeDef;
+    }
+
+
+    function MyComponent() {
+    }
+
+    //3 ways of calling a function:
+    //new View()
+    //View()
+    //@View
+
+    var ViewMetadata = function(viewObj) {
+      this.template = viewObj.template;
+      this.templateUrl = viewObj.templateUrl;
+      this.directives = viewObj.directives;
+    };
+
+    function makeDecorator(MetaDataType, chainFn, metadataFactoryFn) {
+
+      function DecoratorFactory(viewData) {
+        var metaDataInstance = metadataFactoryFn ? metadataFactoryFn(viewData) : new MetaDataType(viewData);
+
+        if (this instanceof MetaDataType) { //called as new View (syntax used to avoid annotations)
+
+          return metaDataInstance;
+
+        } else {
+
+          var TypeDecorator = function TypeDecorator(TypeToES7Decorate) {
+            if (!TypeToES7Decorate.reflectAnnotations) {
+              TypeToES7Decorate.reflectAnnotations = [];
+            }
+            TypeToES7Decorate.reflectAnnotations.push(metaDataInstance);
+            return TypeToES7Decorate;
+          };
+
+          var newAnnotations = [];
+          if (typeof this === "function" && this.annotations) { //called like View({}).View({})
+            newAnnotations = this.annotations;
+          }
+          newAnnotations.push(metaDataInstance);
+
+          TypeDecorator.annotations = newAnnotations;
+          TypeDecorator.Class = Class;
+          if (chainFn) {
+            chainFn(TypeDecorator);
+          }
+
+          return TypeDecorator;
+        }
+      }
+
+      DecoratorFactory.prototype = Object.create(MetaDataType.prototype); //this is to make the "if (this instanceof MetaDataType)" check work
+      //which in turn allows us to detect if a given function was run as a constructor (with new) or not
+      //maybe there is another way of doing the same?
+
+      return DecoratorFactory; //needs to return a constructor function
+    }
+
+    var View = makeDecorator(ViewMetadata, function(TypeDecorator) {
+      TypeDecorator.View = View;
+    });
+
+
+    //new View({})
+    assertEqual(new View({template: 'foo'}).template, 'foo');
+
+    //View
+    var MyComponentEs5 = View({template: 'foo'}).Class(MyComponent);
+    assertEqual(MyComponentEs5.reflectAnnotations[0].template, 'foo');
+
+    //View with chaining
+    var MyComponentEs5MultiView = View({template: 'foo'}).View({template: 'bar'}).Class(MyComponent);
+    assertEqual(MyComponentEs5.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponentEs5.reflectAnnotations[1].template, 'bar');
+
+    //@View
+    var MyComponentDecorated = View({template: 'foo'})(MyComponent);
+    assertEqual(MyComponentDecorated.reflectAnnotations[0].template, 'foo');
+
+    //@View with chaining
+    var MyComponentDecorated = View({template: 'foo'})(MyComponent);
+    MyComponentDecorated = View({template: 'bar'})(MyComponent);
+    assertEqual(MyComponentDecorated.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponentDecorated.reflectAnnotations[1].template, 'bar');
+
+    //@SuperView
+    var SuperView = makeDecorator(ViewMetadata, function(TypeDecorator) {
+      TypeDecorator.View = View;
+      TypeDecorator.SuperView = SuperView;
+    }, function(viewData) {
+
+      return new ViewMetadata({
+        template: viewData.template,
+        templateUrl: viewData.templateUrl,
+        directives: [-1, viewData.directives]
+      });
+    });
+
+    var MySuperComponent = function() {};
+    var MyComponentSuperDecorated = SuperView({template: 'foo', directives: [0, 1]})(MySuperComponent);
+    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].directives[0], -1);
+    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].directives[1][0], 0);
+
+    console.log('ALL GOOD!');
+  </script>
+</head>
+<body>
+
+</body>
+</html>

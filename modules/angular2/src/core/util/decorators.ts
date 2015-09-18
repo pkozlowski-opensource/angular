@@ -230,30 +230,46 @@ if (!(Reflect && Reflect.getMetadata)) {
   throw 'reflect-metadata shim is required when using class decorators';
 }
 
-export function makeDecorator(annotationCls, chainFn: (fn: Function) => void = null): (...args) =>
-    (cls: any) => any {
+export function makeDecorator(annotationCls, chainFn: (fn: Function) => void = null): (...args) => (cls: any) => any {
+
   function DecoratorFactory(objOrType): (cls: any) => any {
+
     var annotationInstance = new (<any>annotationCls)(objOrType);
-    if (this instanceof annotationCls) {
+
+    if (this instanceof annotationCls) {  //called via new View({...})
+
       return annotationInstance;
-    } else {
-      var chainAnnotation =
-          isFunction(this) && this.annotations instanceof Array ? this.annotations : [];
+
+    } else {                              //called via ng.View or @View
+
+      //isFunction(this) is true if I call things like View({}).View({})
+      var chainAnnotation = isFunction(this) && this.annotations instanceof Array ? this.annotations : [];
       chainAnnotation.push(annotationInstance);
-      var TypeDecorator: TypeDecorator = <TypeDecorator>function TypeDecorator(cls) {
-        var annotations = Reflect.getOwnMetadata('annotations', cls);
-        annotations = annotations || [];
+
+      var TypeDecorator: TypeDecorator = <TypeDecorator>function TypeDecorator(cls) { //ES7 decorator function
+        var annotations = Reflect.getOwnMetadata('annotations', cls) || [];
+
         annotations.push(annotationInstance);
         Reflect.defineMetadata('annotations', annotations, cls);
+
         return cls;
       };
-      TypeDecorator.annotations = chainAnnotation;
-      TypeDecorator.Class = Class;
-      if (chainFn) chainFn(TypeDecorator);
+
+      //Here we use ES7 decorator function as a regular object to stick some props and functions for chaining on it
+      TypeDecorator.annotations = chainAnnotation; //only for ng.View().Class() ?
+      TypeDecorator.Class = Class;                 //only for ng.View().Class() ?
+
+      if (chainFn) { //chaining to View like Component({}).View({}).View({}).Class()
+        chainFn(TypeDecorator);
+      }
+
       return TypeDecorator;
     }
   }
-  DecoratorFactory.prototype = Object.create(annotationCls.prototype);
+
+  DecoratorFactory.prototype = Object.create(annotationCls.prototype); //this makes the "if (this instanceof annotationCls)" check work
+  //TODO: this is where I don't understand how prototypes work in JS...
+
   return DecoratorFactory;
 }
 
