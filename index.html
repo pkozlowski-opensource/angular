@@ -81,23 +81,27 @@
     assertEqual(new View({template: 'foo'}).template, 'foo');
 
     //View
-    var MyComponentEs5 = View({template: 'foo'}).Class(MyComponent);
-    assertEqual(MyComponentEs5.reflectAnnotations[0].template, 'foo');
+    View({template: 'foo'}).Class(MyComponent);
+    assertEqual(MyComponent.reflectAnnotations[0].template, 'foo');
+    MyComponent.reflectAnnotations = null;
 
     //View with chaining
-    var MyComponentEs5MultiView = View({template: 'foo'}).View({template: 'bar'}).Class(MyComponent);
-    assertEqual(MyComponentEs5.reflectAnnotations[0].template, 'foo');
-    assertEqual(MyComponentEs5.reflectAnnotations[1].template, 'bar');
+    View({template: 'foo'}).View({template: 'bar'}).Class(MyComponent);
+    assertEqual(MyComponent.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponent.reflectAnnotations[1].template, 'bar');
+    MyComponent.reflectAnnotations = null;
 
     //@View
-    var MyComponentDecorated = View({template: 'foo'})(MyComponent);
-    assertEqual(MyComponentDecorated.reflectAnnotations[0].template, 'foo');
+    View({template: 'foo'})(MyComponent);
+    assertEqual(MyComponent.reflectAnnotations[0].template, 'foo');
+    MyComponent.reflectAnnotations = null;
 
     //@View with chaining
-    var MyComponentDecorated = View({template: 'foo'})(MyComponent);
-    MyComponentDecorated = View({template: 'bar'})(MyComponent);
-    assertEqual(MyComponentDecorated.reflectAnnotations[0].template, 'foo');
-    assertEqual(MyComponentDecorated.reflectAnnotations[1].template, 'bar');
+    View({template: 'foo'})(MyComponent);
+    View({template: 'bar'})(MyComponent);
+    assertEqual(MyComponent.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponent.reflectAnnotations[1].template, 'bar');
+    MyComponent.reflectAnnotations = null;
 
     //@SuperView
     var SuperView = makeDecorator(ViewMetadata, function(TypeDecorator) {
@@ -112,11 +116,11 @@
       });
     });
 
-    var MySuperComponent = function() {};
-    var MyComponentSuperDecorated = SuperView({template: 'foo', directives: [0, 1]})(MySuperComponent);
-    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].template, 'foo');
-    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].directives[0], -1);
-    assertEqual(MyComponentSuperDecorated.reflectAnnotations[0].directives[1][0], 0);
+    SuperView({template: 'foo', directives: [0, 1]})(MyComponent);
+    assertEqual(MyComponent.reflectAnnotations[0].template, 'foo');
+    assertEqual(MyComponent.reflectAnnotations[0].directives[0], -1);
+    assertEqual(MyComponent.reflectAnnotations[0].directives[1][0], 0);
+    MyComponent.reflectAnnotations = null;
 
     console.log('ALL GOOD!');
   </script>
