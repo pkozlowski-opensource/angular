@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+
+  <script src="https://rawgit.com/rbuckton/ReflectDecorators/master/Reflect.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/systemjs/0.18.4/system.js"></script>
+
+  <script>
+    System.config({
+      defaultJSExtensions: true,
+      map: {}
+    });
+    System.import('angular2').then(function(m) {
+      console.log(Object.keys(m));
+    });
+  </script>
+</head>
+<body>
+
+</body>
+</html>
