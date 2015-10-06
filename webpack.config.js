@@ -1,18 +1,19 @@
 var webpack = require("webpack");
 
 module.exports = {
-  entry: "angular2/angular2.js",
+  entry: {
+    core: "angular2/angular2.js",
+    http: "angular2/http.js"
+  },
   resolve: {
     root: './dist/js/prod/es5'
   },
   output: {
-    filename: 'angular2.js',
-    library: 'angular2',
+    filename: '[name].js',
+    library: '[name]',
     libraryTarget: 'commonjs2'
   },
   plugins: [
-    /*new webpack.optimize.UglifyJsPlugin({
-      compress: false
-    })*/
+    new webpack.optimize.CommonsChunkPlugin("angular2.common.js")
   ]
 };
