@@ -1022,7 +1022,9 @@ gulp.task('!bundle.js.prod', ['build.js.prod'], function() {
           bundler.bundle(bundleConfig, 'angular2/http - angular2/core', './dist/build/http.js',
                          bundlerConfig),
           bundler.bundle(bundleConfig, 'angular2/router - angular2/core', './dist/build/router.js',
-                         bundlerConfig)
+                         bundlerConfig),
+          bundler.bundle(bundleConfig, 'angular2/upgrade - angular2/angular2', './dist/build/upgrade.js',
+            bundlerConfig)
         ]);
       });
 });
