@@ -1015,16 +1015,11 @@ gulp.task('!bundle.js.prod', ['build.js.prod'], function() {
   var bundler = require('./tools/build/bundle');
   var bundlerConfig = {sourceMaps: true};
 
-  return bundler.bundle(bundleConfig, 'angular2/angular2', './dist/build/angular2.js',
-                        bundlerConfig)
-      .then(function() {
-        return Promise.all([
-          bundler.bundle(bundleConfig, 'angular2/http - angular2/core', './dist/build/http.js',
-                         bundlerConfig),
-          bundler.bundle(bundleConfig, 'angular2/router - angular2/core', './dist/build/router.js',
-                         bundlerConfig)
-        ]);
-      });
+  return [
+    bundler.bundle(bundleConfig, 'angular2/angular2', './dist/build/angular2.js', bundlerConfig),
+    bundler.bundle(bundleConfig, 'angular2/http - angular2/core', './dist/build/http.js', bundlerConfig),
+    bundler.bundle(bundleConfig, 'angular2/router - angular2/core', './dist/build/router.js', bundlerConfig)
+  ].reduce(Promise.resolve);
 });
 
 // minified production build
@@ -1032,16 +1027,11 @@ gulp.task('!bundle.js.min', ['build.js.prod'], function() {
   var bundler = require('./tools/build/bundle');
   var bundlerConfig = {sourceMaps: true, minify: true};
 
-  return bundler.bundle(bundleConfig, 'angular2/angular2', './dist/build/angular2.min.js',
-                        bundlerConfig)
-      .then(function() {
-        return Promise.all([
-          bundler.bundle(bundleConfig, 'angular2/http - angular2/core', './dist/build/http.min.js',
-                         bundlerConfig),
-          bundler.bundle(bundleConfig, 'angular2/router - angular2/core',
-                         './dist/build/router.min.js', bundlerConfig)
-        ]);
-      });
+  return [
+    bundler.bundle(bundleConfig, 'angular2/angular2', './dist/build/angular2.min.js', bundlerConfig),
+    bundler.bundle(bundleConfig, 'angular2/http - angular2/core', './dist/build/http.min.js', bundlerConfig),
+    bundler.bundle(bundleConfig, 'angular2/router - angular2/core', './dist/build/router.min.js', bundlerConfig)
+  ].reduce(Promise.resolve);
 });
 
 // development build
@@ -1052,16 +1042,11 @@ gulp.task('!bundle.js.dev', ['build.js.dev'], function() {
   var devBundleConfig = merge(true, bundleConfig);
   devBundleConfig.paths = merge(true, devBundleConfig.paths, {"*": "dist/js/dev/es5/*.js"});
 
-  return bundler.bundle(devBundleConfig, 'angular2/angular2', './dist/build/angular2.dev.js',
-                        bundlerConfig)
-      .then(function() {
-        return Promise.all([
-          bundler.bundle(devBundleConfig, 'angular2/http - angular2/core',
-                         './dist/build/http.dev.js', bundlerConfig),
-          bundler.bundle(bundleConfig, 'angular2/router - angular2/core',
-                         './dist/build/router.dev.js', bundlerConfig)
-        ]);
-      });
+  return [
+    bundler.bundle(devBundleConfig, 'angular2/angular2', './dist/build/angular2.dev.js', bundlerConfig),
+    bundler.bundle(devBundleConfig, 'angular2/http - angular2/core', './dist/build/http.dev.js', bundlerConfig),
+    bundler.bundle(bundleConfig, 'angular2/router - angular2/core', './dist/build/router.dev.js', bundlerConfig)
+  ].reduce(Promise.resolve);
 });
 
 // WebWorker build
