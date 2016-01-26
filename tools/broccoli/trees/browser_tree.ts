@@ -175,6 +175,7 @@ module.exports = function makeBrowserTree(options, destinationPath) {
     declaration: false,
     emitDecoratorMetadata: true,
     experimentalDecorators: true,
+    noEmitHelpers: true,
     module: 'commonjs',
     moduleResolution: 'classic',
     noEmitOnError: !noTypeChecks,

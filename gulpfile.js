@@ -706,6 +706,7 @@ gulp.task('!build.payload.js.webpack', function() {
                   'node_modules/zone.js/dist/zone-microtask.js',
                   'node_modules/zone.js/dist/long-stack-trace-zone.js',
                   'node_modules/reflect-metadata/Reflect.js',
+                  'tools/build/webpack/ts-helpers.js',
                   CASE_PATH + '/app-bundle.js'
                 ])
                 .pipe(gulpPlugins.concat(PAYLOAD_TESTS_CONFIG.ts.bundleName))
@@ -736,6 +737,7 @@ gulp.task('!build.payload.js.systemjs', function() {
             gulp.src([
                   'node_modules/systemjs/dist/system.src.js',
                   'dist/js/prod/es5/bundle/angular2-polyfills.js',
+                  'tools/build/webpack/ts-helpers.js',
                   'dist/js/prod/es5/bundle/angular2.js',
                   'dist/js/prod/es5//rxjs/bundles/Rx.js',
                   CASE_PATH + '/index.register.js',
