@@ -91,6 +91,7 @@ export class NgClass implements DoCheck, OnDestroy {
   }
 
   set rawClass(v: string | string[] | Set<string>| {[key: string]: any}) {
+    console.log('setter', v);
     this._cleanupClasses(this._rawClass);
 
     if (isString(v)) {
@@ -110,6 +111,7 @@ export class NgClass implements DoCheck, OnDestroy {
   }
 
   ngDoCheck(): void {
+    console.log('ngDoCheck', this._rawClass);
     if (isPresent(this._iterableDiffer)) {
       var changes = this._iterableDiffer.diff(this._rawClass);
       if (isPresent(changes)) {

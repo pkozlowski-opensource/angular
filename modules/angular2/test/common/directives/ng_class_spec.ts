@@ -130,6 +130,37 @@ export function main() {
                });
          }));
 
+      iit('should work correctly if a reference is changed to an identical object',
+        inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async) => {
+          var template = '<div [ngClass]="objExpr"></div>';
+
+          tcb.overrideTemplate(TestComponent, template)
+            .createAsync(TestComponent)
+            .then((fixture) => {
+              fixture.debugElement.componentInstance.objExpr = {foo: true};
+              detectChangesAndCheck(fixture, 'foo');
+
+              fixture.debugElement.componentInstance.objExpr = {foo: true};
+              detectChangesAndCheck(fixture, 'foo');
+
+              async.done();
+            });
+        }));
+
+      iit('should work correctly if a function returns reference to identical objects',
+        inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async) => {
+          var template = '<div [ngClass]="getObj()"></div>';
+
+          tcb.overrideTemplate(TestComponent, template)
+            .createAsync(TestComponent)
+            .then((fixture) => {
+              detectChangesAndCheck(fixture, 'foo');
+              detectChangesAndCheck(fixture, 'foo');
+              console.log(fixture.debugElement.children[0].nativeElement);
+              async.done();
+            });
+        }));
+
       it('should remove active classes when expression evaluates to null',
          inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async) => {
            var template = '<div [ngClass]="objExpr"></div>';
@@ -539,4 +570,8 @@ class TestComponent {
   strExpr = 'foo';
 
   constructor() { this.setExpr.add('foo'); }
+
+  getObj() {
+    return {'foo': true};
+  }
 }
