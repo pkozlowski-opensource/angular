@@ -1445,6 +1445,20 @@ function declareTests(isJit: boolean) {
            });
          }));
 
+      iit('should report a meaningful error when an output is declared without an associated EventEmitter',
+         inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async: any /** TODO #9100 */) => {
+
+           tcb = tcb.overrideView(MyComp, new ViewMetadata({directives: [BrokenOutputCmp], template: '<broken-out (out)="foo=null"></broken-out>'}));
+
+           PromiseWrapper.catchError(tcb.createAsync(MyComp), (e) => {
+             console.log(e.context);
+             expect(e.message).toEqual(
+                 `The 'out' property is not an instance of Observable, got 'undefined'`);
+             async.done();
+             return null;
+           });
+         }));
+
       it('should provide an error context when an error happens in DI',
          inject([TestComponentBuilder, AsyncTestCompleter], (tcb: TestComponentBuilder, async: any /** TODO #9100 */) => {
 
@@ -2533,4 +2547,9 @@ class DirectiveWithPropDecorators {
 @Component({selector: 'some-cmp'})
 class SomeCmp {
   value: any;
+}
+
+@Component({selector: 'broken-out', template: ''})
+class BrokenOutputCmp {
+  @Output() out: any;
 }

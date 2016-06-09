@@ -1,5 +1,5 @@
 import {reflector} from '../../core_private';
-import {isPresent, IS_DART, FunctionWrapper} from '../facade/lang';
+import {isBlank, isPresent, IS_DART, FunctionWrapper} from '../facade/lang';
 import {ObservableWrapper} from '../facade/async';
 import {BaseException, unimplemented} from '../facade/exceptions';
 import {ListWrapper} from '../facade/collection';
@@ -7,6 +7,7 @@ import {ListWrapper} from '../facade/collection';
 import * as o from './output_ast';
 import {debugOutputAstAsDart} from './dart_emitter';
 import {debugOutputAstAsTypeScript} from './ts_emitter';
+import {stringify} from "../../../platform-server/src/facade/lang";
 
 export function interpretStatements(statements: o.Statement[], resultVar: string,
                                     instanceFactory: InstanceFactory): any {
@@ -179,6 +180,9 @@ class StatementInterpreter implements o.StatementVisitor, o.ExpressionVisitor {
           result = ListWrapper.concat(receiver, args[0]);
           break;
         case o.BuiltinMethod.SubscribeObservable:
+          if (isBlank(receiver) || !ObservableWrapper.isObservable(receiver)) {
+            throw new BaseException(`The '${stringify(expr.receiver)}' property is not an instance of Observable, got '${stringify(receiver)}'.`);
+          }
           result = ObservableWrapper.subscribe(receiver, args[0]);
           break;
         case o.BuiltinMethod.bind:
