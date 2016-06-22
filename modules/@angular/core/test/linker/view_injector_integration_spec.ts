@@ -2,14 +2,16 @@ import {describe, ddescribe, it, iit, xit, xdescribe, expect, beforeEach, before
 import {fakeAsync, flushMicrotasks, Log, tick} from '@angular/core/testing';
 import {TestComponentBuilder, ComponentFixture} from '@angular/compiler/testing';
 import {isBlank} from '../../src/facade/lang';
-import {Type, ViewContainerRef, TemplateRef, ElementRef, ChangeDetectorRef, ChangeDetectionStrategy, Directive, Component, DebugElement, forwardRef, Input, PipeTransform, Attribute, ViewMetadata, provide, Optional, Inject, Self, InjectMetadata, Pipe, Host, SkipSelfMetadata} from '@angular/core';
+import {Injectable, Type, ViewContainerRef, TemplateRef, ElementRef, ChangeDetectorRef, ChangeDetectionStrategy, Directive, Component, DebugElement, forwardRef, Input, PipeTransform, Attribute, ViewMetadata, provide, Optional, Inject, Self, InjectMetadata, Pipe, Host, SkipSelfMetadata} from '@angular/core';
 import {NgIf, NgFor} from '@angular/common';
 import {getDOM} from '@angular/platform-browser/src/dom/dom_adapter';
+import {By} from '@angular/platform-browser';
 
 const ALL_DIRECTIVES = /*@ts2dart_const*/[
   forwardRef(() => SimpleDirective),
   forwardRef(() => CycleDirective),
   forwardRef(() => SimpleComponent),
+  forwardRef(() => Cmpt),
   forwardRef(() => SomeOtherDirective),
   forwardRef(() => NeedsDirectiveFromSelf),
   forwardRef(() => NeedsServiceComponent),
@@ -53,6 +55,15 @@ const ALL_PIPES = /*@ts2dart_const*/[
 @Directive({selector: '[simpleDirective]'})
 class SimpleDirective {
   @Input('simpleDirective') value: any = null;
+}
+
+@Injectable()
+class NeedsElementRefService {
+  constructor(public elementRef: ElementRef) {}
+}
+
+@Component({selector: 'cmp', template: '<span needsService></span>', directives: ALL_DIRECTIVES, providers: [{provide: 'service', useClass: NeedsElementRefService}]})
+class Cmpt {
 }
 
 @Component({selector: '[simpleComponent]', template: '', directives: ALL_DIRECTIVES})
@@ -558,6 +569,25 @@ export function main() {
 
            expect(needsAttribute.fooAttribute).toEqual('bar');
          }));
+    });
+
+    describe('refs into service', () => {
+      function serviceFromEl(el: DebugElement) { return el.injector.get(NeedsService).service; }
+
+      iit('should inject ElementRef', fakeAsync(() => {
+        var el = createComp(
+          '<div needsService></div><cmp needsService></cmp>',
+          tcb.overrideProviders(
+            TestComp, [{provide: 'service', useClass: NeedsElementRefService}]));
+
+        //var el = createComp('<cmp host></cmp>', tcb);
+
+        var withService: any[] = el.queryAll(By.directive(NeedsService));
+        console.log(withService[0].nativeElement, withService[0].injector.get(NeedsService).service.elementRef.nativeElement);
+        console.log(withService[1].nativeElement, withService[1].injector.get(NeedsService).service.elementRef.nativeElement);
+        console.log(withService[2].nativeElement, withService[2].injector.get(NeedsService).service.elementRef.nativeElement);
+
+      }));
     });
 
     describe('refs', () => {
