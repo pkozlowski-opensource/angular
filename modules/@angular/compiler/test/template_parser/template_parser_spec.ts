@@ -1302,6 +1302,13 @@ Parser Error: Unexpected token 'b' at column 3 in [a b] in TestComp@0:5 ("<div [
 More than one component: DirB,DirA ("[ERROR ->]<div>"): TestComp@0:0`);
       });
 
+      it('should report unknown elements with no directives', () => {
+        expect(() => parse('<foo-bar>', [])).toThrowError(`Template parse errors:
+Unknown element 'foo-bar'. Check if the element name is spelled correctly and all relevant directives declared or imported in NgModule: ("[ERROR ->]<foo-bar>"): TestComp@0:0`);
+      });
+
+      //should not throw if an element is listed in a custom schema
+
       it('should not allow components or element bindings nor dom events on explicit embedded templates',
          () => {
            var dirA = CompileDirectiveMetadata.create({

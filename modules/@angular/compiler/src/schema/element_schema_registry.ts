@@ -9,6 +9,7 @@
 import {SchemaMetadata} from '@angular/core';
 
 export abstract class ElementSchemaRegistry {
+  abstract isKnownElement(tagName: string, schemaMetas: SchemaMetadata[]): boolean;
   abstract hasProperty(tagName: string, propName: string, schemaMetas: SchemaMetadata[]): boolean;
   abstract securityContext(tagName: string, propName: string): any;
   abstract getMappedPropName(propName: string): string;

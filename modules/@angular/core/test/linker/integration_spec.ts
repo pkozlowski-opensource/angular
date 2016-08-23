@@ -305,7 +305,7 @@ function declareTests({useJit}: {useJit: boolean}) {
       it('should support template directives via `<template>` elements.', () => {
         TestBed.configureTestingModule({declarations: [MyComp, SomeViewport]});
         const template =
-            '<template some-viewport let-greeting="someTmpl"><copy-me>{{greeting}}</copy-me></template>';
+            '<template some-viewport let-greeting="someTmpl"><span>{{greeting}}</span></template>';
         TestBed.overrideComponent(MyComp, {set: {template}});
         const fixture = TestBed.createComponent(MyComp);
 
@@ -365,7 +365,7 @@ function declareTests({useJit}: {useJit: boolean}) {
       it('should support template directives via `template` attribute.', () => {
         TestBed.configureTestingModule({declarations: [MyComp, SomeViewport]});
         const template =
-            '<copy-me template="some-viewport: let greeting=someTmpl">{{greeting}}</copy-me>';
+            '<span template="some-viewport: let greeting=someTmpl">{{greeting}}</span>';
         TestBed.overrideComponent(MyComp, {set: {template}});
         const fixture = TestBed.createComponent(MyComp);
 

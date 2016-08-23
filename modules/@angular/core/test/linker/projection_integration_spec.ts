@@ -456,9 +456,9 @@ export function main() {
 
       main.detectChanges();
       expect(getDOM().getInnerHTML(main.debugElement.nativeElement))
-          .toEqual(
-              '<cmp-a><cmp-b><cmp-d><d>cmp-d</d></cmp-d></cmp-b>' +
-              '<cmp-c><c>cmp-c</c></cmp-c></cmp-a>');
+          .toEqual( 
+              '<cmp-a><cmp-b><cmp-d><div>cmp-d</div></cmp-d></cmp-b>' +
+              '<cmp-c><div>cmp-c</div></cmp-c></cmp-a>');
     });
 
     it('should create nested components in the right order', () => {
@@ -652,7 +652,7 @@ class Tree {
 }
 
 
-@Component({selector: 'cmp-d', template: `<d>{{tagName}}</d>`})
+@Component({selector: 'cmp-d', template: `<div>{{tagName}}</div>`})
 class CmpD {
   tagName: string;
   constructor(elementRef: ElementRef) {
@@ -661,7 +661,7 @@ class CmpD {
 }
 
 
-@Component({selector: 'cmp-c', template: `<c>{{tagName}}</c>`})
+@Component({selector: 'cmp-c', template: `<div>{{tagName}}</div>`})
 class CmpC {
   tagName: string;
   constructor(elementRef: ElementRef) {

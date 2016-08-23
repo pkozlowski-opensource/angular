@@ -16,6 +16,10 @@ export class MockSchemaRegistry implements ElementSchemaRegistry {
       public existingProperties: {[key: string]: boolean},
       public attrPropMapping: {[key: string]: string}) {}
 
+  isKnownElement(tagName: string, schemaMetas: SchemaMetadata[]): boolean {
+    return true;
+  }
+
   hasProperty(tagName: string, property: string, schemas: SchemaMetadata[]): boolean {
     var result = this.existingProperties[property];
     return isPresent(result) ? result : true;

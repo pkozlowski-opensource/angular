@@ -173,6 +173,7 @@ export function main() {
     beforeEach(async(() => {
       TestBed.configureTestingModule({
         declarations: [
+          BankAccount,
           ChildComp,
           ConditionalContentComp,
           ConditionalParentComp,

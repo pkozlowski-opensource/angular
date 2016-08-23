@@ -90,6 +90,7 @@ const SCHEMA: string[] = ([
   'a|charset,coords,download,hash,host,hostname,href,hreflang,name,password,pathname,ping,port,protocol,referrerpolicy,rel,rev,search,shape,target,text,type,username',
   'area|alt,coords,hash,host,hostname,href,!noHref,password,pathname,ping,port,protocol,referrerpolicy,search,shape,target,username',
   'audio^media|',
+  'b|',
   'br|clear',
   'base|href,target',
   'body|aLink,background,bgColor,link,*beforeunload,*blur,*error,*focus,*hashchange,*languagechange,*load,*message,*offline,*online,*pagehide,*pageshow,*popstate,*rejectionhandled,*resize,*scroll,*storage,*unhandledrejection,*unload,text,vLink',
@@ -112,6 +113,7 @@ const SCHEMA: string[] = ([
   'head|',
   'h1,h2,h3,h4,h5,h6|align',
   'html|version',
+  'i|',
   'iframe|align,!allowFullscreen,frameBorder,height,longDesc,marginHeight,marginWidth,name,referrerpolicy,%sandbox,scrolling,src,srcdoc,width',
   'img|align,alt,border,%crossOrigin,#height,#hspace,!isMap,longDesc,lowsrc,name,referrerpolicy,sizes,src,srcset,useMap,#vspace,#width',
   'input|accept,align,alt,autocapitalize,autocomplete,!autofocus,!checked,!defaultChecked,defaultValue,dirName,!disabled,%files,formAction,formEnctype,formMethod,!formNoValidate,formTarget,#height,!incremental,!indeterminate,max,#maxLength,min,#minLength,!multiple,name,pattern,placeholder,!readOnly,!required,selectionDirection,#selectionEnd,#selectionStart,#size,src,step,type,useMap,value,%valueAsDate,#valueAsNumber,#width',
@@ -267,6 +269,15 @@ export class DomElementSchemaRegistry extends ElementSchemaRegistry {
         }
       });
     });
+  }
+
+  isKnownElement(tagName: string, schemaMetas: SchemaMetadata[]): boolean {
+    //TODO: code duplication
+    if (tagName === 'ng-container' || tagName === 'ng-content') {
+        return true;
+    }
+
+    return isPresent(this.schema[tagName.toLowerCase()]);
   }
 
   hasProperty(tagName: string, propName: string, schemaMetas: SchemaMetadata[]): boolean {

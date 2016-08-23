@@ -422,6 +422,7 @@ class TemplateParseVisitor implements html.Visitor {
           hasInlineTemplates ? null : ngContentIndex, element.sourceSpan);
     } else {
       this._assertOnlyOneComponent(directiveAsts, element.sourceSpan);
+      this._assertKnownElement(element.name, directiveAsts, element.sourceSpan);
       const ngContentIndex =
           hasInlineTemplates ? null : parent.findNgContentIndex(projectionSelector);
       parsedElement = new ElementAst(
@@ -896,6 +897,12 @@ class TemplateParseVisitor implements html.Visitor {
     const componentTypeNames = this._findComponentDirectiveNames(directives);
     if (componentTypeNames.length > 1) {
       this._reportError(`More than one component: ${componentTypeNames.join(',')}`, sourceSpan);
+    }
+  }
+
+  private _assertKnownElement(tagName: string, directives: DirectiveAst[], sourceSpan: ParseSourceSpan) {
+    if (directives.length === 0 && !this._schemaRegistry.isKnownElement(tagName, [])) {
+      this._reportError(`Unknown element '${tagName}'. Check if the element name is spelled correctly and all relevant directives declared or imported in NgModule`, sourceSpan);
     }
   }
 
