@@ -84,7 +84,7 @@ function compileDirectiveMetadataCreate(
 
 function compileTemplateMetadata({encapsulation, template, templateUrl, styles, styleUrls,
                                   externalStylesheets, animations, ngContentSelectors,
-                                  interpolation, isInline}: {
+                                  interpolation, isInline, preserveWhitespaces}: {
   encapsulation?: ViewEncapsulation | null,
   template?: string | null,
   templateUrl?: string | null,
@@ -94,7 +94,8 @@ function compileTemplateMetadata({encapsulation, template, templateUrl, styles, 
   ngContentSelectors?: string[],
   animations?: any[],
   interpolation?: [string, string] | null,
-  isInline?: boolean
+  isInline?: boolean,
+  preserveWhitespaces?: boolean | null,
 }): CompileTemplateMetadata {
   return new CompileTemplateMetadata({
     encapsulation: noUndefined(encapsulation),
@@ -106,7 +107,8 @@ function compileTemplateMetadata({encapsulation, template, templateUrl, styles, 
     animations: animations || [],
     ngContentSelectors: ngContentSelectors || [],
     interpolation: noUndefined(interpolation),
-    isInline: !!isInline
+    isInline: !!isInline,
+    preserveWhitespaces: preserveWhitespaces == null ? true : preserveWhitespaces,
   });
 }
 
@@ -116,7 +118,7 @@ export function main() {
   let ngIf: CompileDirectiveSummary;
   let parse: (
       template: string, directives: CompileDirectiveSummary[], pipes?: CompilePipeSummary[],
-      schemas?: SchemaMetadata[]) => TemplateAst[];
+      schemas?: SchemaMetadata[], preserveWhitespaces?: boolean) => TemplateAst[];
   let console: ArrayConsole;
 
   function commonBeforeEach() {
@@ -148,12 +150,15 @@ export function main() {
 
       parse =
           (template: string, directives: CompileDirectiveSummary[],
-           pipes: CompilePipeSummary[] | null = null,
-           schemas: SchemaMetadata[] = []): TemplateAst[] => {
+           pipes: CompilePipeSummary[] | null = null, schemas: SchemaMetadata[] = [],
+           preserveWhitespaces = true): TemplateAst[] => {
             if (pipes === null) {
               pipes = [];
             }
-            return parser.parse(component, template, directives, pipes, schemas, 'TestComp')
+            return parser
+                .parse(
+                    component, template, directives, pipes, schemas, 'TestComp',
+                    preserveWhitespaces)
                 .template;
           };
     }));
@@ -398,7 +403,8 @@ export function main() {
                externalStylesheets: [],
                styleUrls: [],
                styles: [],
-               encapsulation: null
+               encapsulation: null,
+               preserveWhitespaces: true
              }),
              isHost: false,
              exportAs: null,
@@ -417,7 +423,7 @@ export function main() {
 
            });
            expect(humanizeTplAst(
-                      parser.parse(component, '{%a%}', [], [], [], 'TestComp').template,
+                      parser.parse(component, '{%a%}', [], [], [], 'TestComp', true).template,
                       {start: '{%', end: '%}'}))
                .toEqual([[BoundTextAst, '{% a %}']]);
          }));
@@ -2050,6 +2056,45 @@ The pipe 'test' could not be found ("{{[ERROR ->]a | test}}"): TestComp@0:2`);
         ]);
       });
     });
+  });
+
+  describe('whitespaces removal', () => {
+
+    it('should not remove whitespaces by default', () => {
+      expect(humanizeTplAst(parse(' <br>  <br>\t<br>\n<br> ', []))).toEqual([
+        [TextAst, ' '],
+        [ElementAst, 'br'],
+        [TextAst, '  '],
+        [ElementAst, 'br'],
+        [TextAst, '\t'],
+        [ElementAst, 'br'],
+        [TextAst, '\n'],
+        [ElementAst, 'br'],
+        [TextAst, ' '],
+      ]);
+    });
+
+    it('should remove whitespaces when explicitly requested', () => {
+      expect(humanizeTplAst(parse(' <br>  <br>\t<br>\n<br> ', [], [], [], false))).toEqual([
+        [ElementAst, 'br'],
+        [ElementAst, 'br'],
+        [ElementAst, 'br'],
+        [ElementAst, 'br'],
+      ]);
+    });
+
+    it('should require explicit whitespace between ICU expansions when removing whitespaces',
+       () => {
+         const shortForm = '{ count, plural, =0 {small} many {big} }';
+         const expandedForm = '<ng-container [ngPlural]="count">' +
+             '<ng-template ngPluralCase="=0">small</ng-template>' +
+             '<ng-template ngPluralCase="many">big</ng-template>' +
+             '</ng-container>';
+         const humanizedExpandedForm = humanizeTplAst(parse(expandedForm, []));
+         expect(humanizeTplAst(parse(`${shortForm}&ngsp;${shortForm}`, [], [], [], false)))
+             .toEqual([...humanizedExpandedForm, [TextAst, ' '], ...humanizedExpandedForm]);
+       });
+
   });
 
   describe('Template Parser - opt-out `<template>` support', () => {

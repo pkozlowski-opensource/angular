@@ -71,6 +71,9 @@ export function mergeNsAndName(prefix: string, localName: string): string {
 // This list is not exhaustive to keep the compiler footprint low.
 // The `&#123;` / `&#x1ab;` syntax should be used when the named character reference does not
 // exist.
+
+// The &ngsp; pseudo-entity is denoting a space. see:
+// https://github.com/dart-lang/angular/blob/0bb611387d29d65b5af7f9d2515ab571fd3fbee4/_tests/test/compiler/preserve_whitespace_test.dart
 export const NAMED_ENTITIES: {[k: string]: string} = {
   'Aacute': '\u00C1',
   'aacute': '\u00E1',
@@ -202,6 +205,7 @@ export const NAMED_ENTITIES: {[k: string]: string} = {
   'nbsp': '\u00A0',
   'ndash': '\u2013',
   'ne': '\u2260',
+  'ngsp': '\uE500',
   'ni': '\u220B',
   'not': '\u00AC',
   'notin': '\u2209',

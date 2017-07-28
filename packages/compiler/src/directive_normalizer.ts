@@ -31,6 +31,7 @@ export interface PrenormalizedTemplateMetadata {
   interpolation: [string, string]|null;
   encapsulation: ViewEncapsulation|null;
   animations: CompileAnimationEntryMetadata[];
+  preserveWhitespaces: boolean|null;
 }
 
 @CompilerInjectable()
@@ -82,6 +83,13 @@ export class DirectiveNormalizer {
       throw syntaxError(
           `No template specified for component ${stringify(prenormData.componentType)}`);
     }
+
+    if (isDefined(prenormData.preserveWhitespaces) &&
+        typeof prenormData.preserveWhitespaces !== 'boolean') {
+      throw syntaxError(
+          `The preserveWhitespaces option for component ${stringify(prenormData.componentType)} must be a boolean`);
+    }
+
     return SyncAsync.then(
         this.normalizeTemplateOnly(prenormData),
         (result: CompileTemplateMetadata) => this.normalizeExternalStylesheets(result));
@@ -134,6 +142,11 @@ export class DirectiveNormalizer {
       encapsulation = this._config.defaultEncapsulation;
     }
 
+    let preserveWhitespaces = prenormData.preserveWhitespaces;
+    if (preserveWhitespaces == null) {
+      preserveWhitespaces = true;
+    }
+
     const styles = templateMetadataStyles.styles.concat(templateStyles.styles);
     const styleUrls = templateMetadataStyles.styleUrls.concat(templateStyles.styleUrls);
 
@@ -149,7 +162,8 @@ export class DirectiveNormalizer {
       ngContentSelectors: visitor.ngContentSelectors,
       animations: prenormData.animations,
       interpolation: prenormData.interpolation, isInline,
-      externalStylesheets: []
+      externalStylesheets: [],
+      preserveWhitespaces: preserveWhitespaces
     });
   }
 
@@ -168,6 +182,7 @@ export class DirectiveNormalizer {
           animations: templateMeta.animations,
           interpolation: templateMeta.interpolation,
           isInline: templateMeta.isInline,
+          preserveWhitespaces: templateMeta.preserveWhitespaces,
         }));
   }
 

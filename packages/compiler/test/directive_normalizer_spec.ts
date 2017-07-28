@@ -31,6 +31,7 @@ function normalizeTemplate(normalizer: DirectiveNormalizer, o: {
   interpolation?: [string, string] | null;
   encapsulation?: ViewEncapsulation | null;
   animations?: CompileAnimationEntryMetadata[];
+  preserveWhitespaces?: boolean | null;
 }) {
   return normalizer.normalizeTemplate({
     ngModuleType: noUndefined(o.ngModuleType),
@@ -42,7 +43,8 @@ function normalizeTemplate(normalizer: DirectiveNormalizer, o: {
     styleUrls: noUndefined(o.styleUrls),
     interpolation: noUndefined(o.interpolation),
     encapsulation: noUndefined(o.encapsulation),
-    animations: noUndefined(o.animations)
+    animations: noUndefined(o.animations),
+    preserveWhitespaces: noUndefined(o.preserveWhitespaces),
   });
 }
 
@@ -54,6 +56,7 @@ function normalizeTemplateOnly(normalizer: DirectiveNormalizer, o: {
   interpolation?: [string, string] | null;
   encapsulation?: ViewEncapsulation | null;
   animations?: CompileAnimationEntryMetadata[];
+  preserveWhitespaces?: boolean | null;
 }) {
   return normalizer.normalizeTemplateOnly({
     ngModuleType: noUndefined(o.ngModuleType),
@@ -65,13 +68,14 @@ function normalizeTemplateOnly(normalizer: DirectiveNormalizer, o: {
     styleUrls: noUndefined(o.styleUrls),
     interpolation: noUndefined(o.interpolation),
     encapsulation: noUndefined(o.encapsulation),
-    animations: noUndefined(o.animations)
+    animations: noUndefined(o.animations),
+    preserveWhitespaces: noUndefined(o.preserveWhitespaces),
   });
 }
 
 function compileTemplateMetadata({encapsulation, template, templateUrl, styles, styleUrls,
                                   externalStylesheets, animations, ngContentSelectors,
-                                  interpolation, isInline}: {
+                                  interpolation, isInline, preserveWhitespaces}: {
   encapsulation?: ViewEncapsulation | null,
   template?: string | null,
   templateUrl?: string | null,
@@ -81,7 +85,8 @@ function compileTemplateMetadata({encapsulation, template, templateUrl, styles, 
   ngContentSelectors?: string[],
   animations?: any[],
   interpolation?: [string, string] | null,
-  isInline?: boolean
+  isInline?: boolean,
+  preserveWhitespaces?: boolean | null
 }): CompileTemplateMetadata {
   return new CompileTemplateMetadata({
     encapsulation: encapsulation || null,
@@ -94,6 +99,7 @@ function compileTemplateMetadata({encapsulation, template, templateUrl, styles, 
     animations: animations || [],
     interpolation: interpolation || null,
     isInline: !!isInline,
+    preserveWhitespaces: preserveWhitespaces == null ? true : preserveWhitespaces,
   });
 }
 
@@ -106,6 +112,7 @@ function normalizeLoadedTemplate(
       interpolation?: [string, string] | null;
       encapsulation?: ViewEncapsulation | null;
       animations?: CompileAnimationEntryMetadata[];
+      preserveWhitespaces?: boolean;
     },
     template: string, templateAbsUrl: string) {
   return normalizer.normalizeLoadedTemplate(
@@ -120,6 +127,7 @@ function normalizeLoadedTemplate(
         interpolation: o.interpolation || null,
         encapsulation: o.encapsulation || null,
         animations: o.animations || [],
+        preserveWhitespaces: noUndefined(o.preserveWhitespaces),
       },
       template, templateAbsUrl);
 }
@@ -168,6 +176,18 @@ export function main() {
                     templateUrl: '',
                   }))
                .toThrowError(`'SomeComp' component cannot define both template and templateUrl`);
+         }));
+      it('should throw if preserveWhitespaces is not a boolean',
+         inject([DirectiveNormalizer], (normalizer: DirectiveNormalizer) => {
+           expect(() => normalizeTemplate(normalizer, {
+                    ngModuleType: null,
+                    componentType: SomeComp,
+                    moduleUrl: SOME_MODULE_URL,
+                    template: '',
+                    preserveWhitespaces: <any>'WRONG',
+                  }))
+               .toThrowError(
+                   'The preserveWhitespaces option for component SomeComp must be a boolean');
          }));
     });
 
