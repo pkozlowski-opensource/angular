@@ -123,6 +123,7 @@ export class JitCompilerFactory implements CompilerFactory {
       defaultEncapsulation: ViewEncapsulation.Emulated,
       missingTranslation: MissingTranslationStrategy.Warning,
       enableLegacyTemplate: true,
+      preserveWhitespaces: true,
     };
 
     this._defaultOptions = [compilerOptions, ...defaultOptions];
@@ -142,6 +143,7 @@ export class JitCompilerFactory implements CompilerFactory {
             defaultEncapsulation: opts.defaultEncapsulation,
             missingTranslation: opts.missingTranslation,
             enableLegacyTemplate: opts.enableLegacyTemplate,
+            preserveWhitespaces: opts.preserveWhitespaces,
           });
         },
         deps: []

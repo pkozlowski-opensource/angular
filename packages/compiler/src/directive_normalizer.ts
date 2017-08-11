@@ -144,7 +144,7 @@ export class DirectiveNormalizer {
 
     let preserveWhitespaces = prenormData.preserveWhitespaces;
     if (preserveWhitespaces == null) {
-      preserveWhitespaces = true;
+      preserveWhitespaces = this._config.preserveWhitespaces;
     }
 
     const styles = templateMetadataStyles.styles.concat(templateStyles.styles);

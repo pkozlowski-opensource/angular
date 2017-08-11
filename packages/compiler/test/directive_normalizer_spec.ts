@@ -99,7 +99,7 @@ function compileTemplateMetadata({encapsulation, template, templateUrl, styles, 
     animations: animations || [],
     interpolation: interpolation || null,
     isInline: !!isInline,
-    preserveWhitespaces: preserveWhitespaces == null ? true : preserveWhitespaces,
+    preserveWhitespaces: preserveWhitespaces !== false,
   });
 }
 
@@ -450,6 +450,25 @@ export function main() {
                '', 'package:some/module/');
            expect(template.encapsulation).toBe(viewEncapsulation);
          }));
+
+      it('should store the preserveWhitespaces in the result',
+        inject([DirectiveNormalizer], (normalizer: DirectiveNormalizer) => {
+          const template = normalizeLoadedTemplate(
+            normalizer, {
+              preserveWhitespaces: false
+            },
+            '', '');
+          expect(template.preserveWhitespaces).toBe(false);
+        }));
+
+      it('should use preserveWhitespaces setting from compiler config by default',
+        inject([DirectiveNormalizer, CompilerConfig], (normalizer: DirectiveNormalizer, config: CompilerConfig) => {
+          const template = normalizeLoadedTemplate(
+            normalizer, {
+            },
+            '', '');
+          expect(template.preserveWhitespaces).toBe(config.preserveWhitespaces);
+        }));
 
       it('should keep the template as html',
          inject([DirectiveNormalizer], (normalizer: DirectiveNormalizer) => {

@@ -19,18 +19,21 @@ export class CompilerConfig {
   public enableLegacyTemplate: boolean;
   public useJit: boolean;
   public missingTranslation: MissingTranslationStrategy|null;
+  public preserveWhitespaces: boolean;
 
   constructor(
       {defaultEncapsulation = ViewEncapsulation.Emulated, useJit = true, missingTranslation,
-       enableLegacyTemplate}: {
+       enableLegacyTemplate, preserveWhitespaces}: {
         defaultEncapsulation?: ViewEncapsulation,
         useJit?: boolean,
         missingTranslation?: MissingTranslationStrategy,
         enableLegacyTemplate?: boolean,
+        preserveWhitespaces?: boolean
       } = {}) {
     this.defaultEncapsulation = defaultEncapsulation;
     this.useJit = !!useJit;
     this.missingTranslation = missingTranslation || null;
     this.enableLegacyTemplate = enableLegacyTemplate !== false;
+    this.preserveWhitespaces = preserveWhitespaces !== false;
   }
 }

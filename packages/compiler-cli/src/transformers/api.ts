@@ -117,6 +117,9 @@ export interface CompilerOptions extends ts.CompilerOptions {
   i18nInFile?: string;
   // How to handle missing messages
   i18nInMissingTranslations?: 'error'|'warning'|'ignore';
+
+  // Whether to remove blank text nodes from compiled templates
+  preserveWhitespaces?: boolean;
 }
 
 export interface ModuleFilenameResolver {
