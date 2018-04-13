@@ -128,6 +128,27 @@ export class LQueries_ implements LQueries {
     return result ? new LQueries_(result) : null;
   }
 
+  createView() {
+    let result: LQuery<any>|null = null;
+    let query = this.deep;
+
+    while (query) {
+      const clonedQuery: LQuery<any> =
+          {next: null, list: query.list, predicate: query.predicate, values: []};
+      clonedQuery.next = result;
+      result = clonedQuery;
+      query = query.next;
+    }
+
+    return result ? new LQueries_(result) : null;
+  }
+
+  // I would call this on a view where I've got values for queries active on the view definition
+  // here I would have to find and index of a container into which I'm inserting
+  insertView(lcontainer: LContainer, index: number) {
+
+  }
+
   enterView(index: number): LQueries|null {
     let result: LQuery<any>|null = null;
     let query = this.deep;

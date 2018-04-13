@@ -8,8 +8,10 @@
 
 import {NgForOfContext} from '@angular/common';
 
-import {defineComponent} from '../../src/render3/index';
-import {bind, container, elementEnd, elementProperty, elementStart, interpolation3, text, textBinding, tick} from '../../src/render3/instructions';
+import {defineComponent, QueryList} from '../../src/render3/index';
+import {bind, container, elementEnd, elementProperty, elementStart, interpolation3, text, textBinding, load} from '../../src/render3/instructions';
+import {query, queryRefresh} from '../../src/render3/query';
+import {QUERY_READ_ELEMENT_REF} from '../../src/render3/di';
 import {RenderFlags} from '../../src/render3/interfaces/definition';
 import {NgForOf, NgIf} from './common_with_def';
 import {ComponentFixture} from './render_util';
@@ -182,6 +184,53 @@ describe('@angular/common integration', () => {
       fixture.component.valueTwo = '$$two$$';
       fixture.update();
       expect(fixture.html).toEqual('<div>$$one$$</div><div>$$two$$</div>');
+    });
+
+    it('should query elements inserted by ngIf', () => {
+
+      class MyApp {
+        showing = false;
+        query: QueryList<any>;
+
+        static ngComponentDef = defineComponent({
+          type: MyApp,
+          factory: () => new MyApp(),
+          selectors: [['my-app']],
+          template: (rf: RenderFlags, myApp: MyApp) => {
+            if (rf & RenderFlags.Create) {
+              query(0, ['foo'], true, QUERY_READ_ELEMENT_REF);
+              container(1, ngIfTemplate, undefined, ['ngIf', '']);
+            }
+            if (rf & RenderFlags.Update) {
+              let tmp: any;
+              elementProperty(1, 'ngIf', bind(myApp.showing));
+              queryRefresh(tmp = load<QueryList<any>>(0)) && (myApp.query = tmp as QueryList<any>);
+            }
+
+            function ngIfTemplate(rf: RenderFlags, ctx: any) {
+              if (rf & RenderFlags.Create) {
+                elementStart(0, 'div', null, ['foo', '']);
+                elementEnd();
+              }
+            }
+          },
+          directives: () => [NgIf]
+        });
+      }
+
+      const fixture = new ComponentFixture(MyApp);
+      expect(fixture.html).toEqual('');
+      expect(fixture.component.query.length).toBe(0);
+
+      fixture.component.showing = true;
+      fixture.update();
+      expect(fixture.html).toEqual('<div></div>');
+      expect(fixture.component.query.length).toBe(1);
+
+      fixture.component.showing = false;
+      fixture.update();
+      expect(fixture.html).toEqual('');
+      expect(fixture.component.query.length).toBe(0);
     });
 
   });

@@ -452,7 +452,7 @@ export function renderTemplate<T>(
 
 export function renderEmbeddedTemplate<T>(
     viewNode: LViewNode | null, template: ComponentTemplate<T>, context: T, renderer: Renderer3,
-    directives?: DirectiveDefList | null, pipes?: PipeDefList | null): LViewNode {
+    directives?: DirectiveDefList | null, pipes?: PipeDefList | null, queries?: LQueries|null): LViewNode {
   const _isParent = isParent;
   const _previousOrParentNode = previousOrParentNode;
   let oldView: LView;
@@ -466,6 +466,12 @@ export function renderEmbeddedTemplate<T>(
 
       viewNode = createLNode(null, LNodeType.View, null, lView);
       rf = RenderFlags.Create;
+
+      if (queries) {
+        // TODO(pk): at this point I don't know what is the index of the insertion point...
+        // TODO(pk): probably should assume that I'm always inserting it at the end...
+        lView.queries = queries.enterView(0);
+      }
     }
     oldView = enterView(viewNode.data, viewNode);
 
