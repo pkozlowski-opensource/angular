@@ -481,7 +481,7 @@ export function renderTemplate<T>(
 export function renderEmbeddedTemplate<T>(
     viewNode: LViewNode | null, tView: TView, template: ComponentTemplate<T>, context: T,
     renderer: Renderer3, directives?: DirectiveDefList | null,
-    pipes?: PipeDefList | null): LViewNode {
+    pipes?: PipeDefList | null, queries?: LQueries | null): LViewNode {
   const _isParent = isParent;
   const _previousOrParentNode = previousOrParentNode;
   let oldView: LView;
@@ -492,6 +492,9 @@ export function renderEmbeddedTemplate<T>(
 
     if (viewNode == null) {
       const lView = createLView(-1, renderer, tView, template, context, LViewFlags.CheckAlways);
+      if (queries) {
+        lView.queries = queries.createView();
+      }
 
       viewNode = createLNode(null, LNodeType.View, null, lView);
       rf = RenderFlags.Create;
@@ -1526,6 +1529,12 @@ export function containerRefreshEnd(): void {
   // remove extra views at the end of the container
   while (nextIndex < container.data.views.length) {
     removeView(container, nextIndex);
+    // TODO(pk): code duplication with scanForView => extract to a separate method that should be:
+    // LContainerNode aware
+    // LView aware
+    // => at the end of a day LConainer and LView should be the only thing that matter
+    // Notify query that view has been removed
+    container.data.queries && container.data.queries.removeView(nextIndex);
   }
 }
 
@@ -1564,6 +1573,8 @@ function scanForView(
     } else if (viewAtPositionId < viewBlockId) {
       // found a view that should not be at this position - remove
       removeView(containerNode, i);
+      // Notify query that view has been removed
+      containerNode.data.queries && containerNode.data.queries.removeView(i);
     } else {
       // found a view with id grater than the one we are searching for
       // which means that required view doesn't exist and can't be found at

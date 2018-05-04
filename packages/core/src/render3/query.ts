@@ -59,6 +59,9 @@ export interface LQuery<T> {
    */
   next: LQuery<any>|null;
 
+  // TODO(pk): document
+  parent: LQuery<any>|null;
+
   /**
    * Destination to which the value should be added.
    */
@@ -118,8 +121,61 @@ export class LQueries_ implements LQueries {
     while (query) {
       const containerValues: any[] = [];  // prepare room for views
       query.values.push(containerValues);
+      // TODO(pk): extract object creation logic
       const clonedQuery: LQuery<any> =
-          {next: null, list: query.list, predicate: query.predicate, values: containerValues};
+          {next: null, parent: null, list: query.list, predicate: query.predicate, values: containerValues};
+      clonedQuery.next = result;
+      result = clonedQuery;
+      query = query.next;
+    }
+
+    return result ? new LQueries_(result) : null;
+  }
+
+  insertView(containerIdx: number, viewIdx: number) {
+    let query = this.deep;
+    let parentQuery: LQuery<any>|null;
+
+    while (query) {
+      parentQuery = query.parent;
+
+      if (parentQuery) {
+        const parentValues = parentQuery.values[containerIdx] || (parentQuery.values[containerIdx] = []);
+        parentValues.splice(viewIdx, 0, query.values);
+      }
+
+      query = query.next;
+    }
+  }
+
+  removeViewFromContainer(containerIdx: number, viewIdx: number) {
+    let query = this.deep;
+    let parentQuery: LQuery<any>|null;
+
+    while (query) {
+      parentQuery = query.parent;
+
+      if (parentQuery) {
+        const parentValues = parentQuery.values[containerIdx];
+        const removed = parentValues.splice(viewIdx, 1);
+        if (removed[0].length) {
+          parentQuery.list.setDirty();
+        }
+      }
+
+      query = query.next;
+    }
+  }
+
+  createView(): LQueries|null {
+    let result: LQuery<any>|null = null;
+    let query = this.deep;
+
+    while (query) {
+      const viewValues: any[] = [];  // prepare room for nodes matching query predicate in a given view
+      // TODO(pk): extract object creation logic
+      const clonedQuery: LQuery<any> =
+          {next: null, parent: query, list: query.list, predicate: query.predicate, values: viewValues};
       clonedQuery.next = result;
       result = clonedQuery;
       query = query.next;
@@ -136,7 +192,7 @@ export class LQueries_ implements LQueries {
       const viewValues: any[] = [];  // prepare room for view nodes
       query.values.splice(index, 0, viewValues);
       const clonedQuery: LQuery<any> =
-          {next: null, list: query.list, predicate: query.predicate, values: viewValues};
+          {next: null, parent: null, list: query.list, predicate: query.predicate, values: viewValues};
       clonedQuery.next = result;
       result = clonedQuery;
       query = query.next;
@@ -278,6 +334,8 @@ function createQuery<T>(
     read: QueryReadType<T>| Type<T>| null): LQuery<T> {
   return {
     next: previous,
+    // TODO(pk): extract object creation logic
+    parent: null,
     list: queryList,
     predicate: createPredicate(predicate, read),
     values: (queryList as any as QueryList_<T>)._valuesTree

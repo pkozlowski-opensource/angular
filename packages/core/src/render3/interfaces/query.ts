@@ -33,6 +33,13 @@ export interface LQueries {
    */
   container(): LQueries|null;
 
+  // TODO(pk): document
+  createView(): LQueries|null;
+
+  insertView(containerIdx: number, viewIdx: number): void;
+
+  removeViewFromContainer(containerIdx: number, viewIdx: number): void;
+
   /**
    * Notify `LQueries` that a new view was created and is being entered in the creation mode.
    * This allow queries to prepare space for matching nodes from views.

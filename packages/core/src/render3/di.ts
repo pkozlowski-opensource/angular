@@ -24,7 +24,7 @@ import {LContainer} from './interfaces/container';
 import {ComponentTemplate, DirectiveDef, DirectiveDefList, PipeDefList} from './interfaces/definition';
 import {LInjector} from './interfaces/injector';
 import {LContainerNode, LElementNode, LNode, LNodeType, LViewNode, TNodeFlags} from './interfaces/node';
-import {QueryReadType} from './interfaces/query';
+import {QueryReadType, LQueries} from './interfaces/query';
 import {Renderer3} from './interfaces/renderer';
 import {LView, TView} from './interfaces/view';
 import {assertNodeOfPossibleTypes, assertNodeType} from './node_assert';
@@ -636,6 +636,11 @@ class ViewContainerRef implements viewEngine_ViewContainerRef {
 
     (lViewNode as{parent: LNode}).parent = this._lContainerNode;
 
+    if (lViewNode.data.queries) {
+      // TODO(PK): calculate container index
+      lViewNode.data.queries.insertView(0, adjustedIdx);
+    }
+
     // If the view is dynamic (has a template), it needs to be counted both at the container
     // level and at the node above the container.
     if (lViewNode.data.template !== null) {
@@ -668,10 +673,20 @@ class ViewContainerRef implements viewEngine_ViewContainerRef {
     // detach projected nodes
   }
 
-  detach(index?: number): viewEngine_ViewRef|null {
+  detach(index?: number): viewEngine_ViewRef | null {
     const adjustedIdx = this._adjustIndex(index, -1);
     removeView(this._lContainerNode, adjustedIdx);
-    return this._viewRefs.splice(adjustedIdx, 1)[0] || null;
+
+    const viewRef = this._viewRefs.splice(adjustedIdx, 1)[0] || null;
+
+    // TODO(pk): this is a "brutal" cast
+    const lViewNode = (viewRef as EmbeddedViewRef<any>)._lViewNode;
+    if (lViewNode.data.queries) {
+      // TODO(PK): calculate container index
+      lViewNode.data.queries.removeViewFromContainer(0, adjustedIdx);
+    }
+
+    return viewRef;
   }
 
   private _adjustIndex(index?: number, shift: number = 0) {
@@ -706,7 +721,7 @@ export function getOrCreateTemplateRef<T>(di: LInjector): viewEngine_TemplateRef
     ngDevMode && assertNotNull(hostTNode.tViews, 'TView must be allocated');
     di.templateRef = new TemplateRef<any>(
         getOrCreateElementRef(di), hostTNode.tViews as TView, hostNode.data.template !,
-        getRenderer(), hostTView.directiveRegistry, hostTView.pipeRegistry);
+        getRenderer(), hostTView.directiveRegistry, hostTView.pipeRegistry, hostNode.queries);
   }
   return di.templateRef;
 }
@@ -717,13 +732,13 @@ class TemplateRef<T> implements viewEngine_TemplateRef<T> {
   constructor(
       elementRef: viewEngine_ElementRef, private _tView: TView,
       private _template: ComponentTemplate<T>, private _renderer: Renderer3,
-      private _directives: DirectiveDefList|null, private _pipes: PipeDefList|null) {
+      private _directives: DirectiveDefList|null, private _pipes: PipeDefList|null, private _queries: LQueries|null) {
     this.elementRef = elementRef;
   }
 
   createEmbeddedView(context: T): viewEngine_EmbeddedViewRef<T> {
     const viewNode = renderEmbeddedTemplate(
-        null, this._tView, this._template, context, this._renderer, this._directives, this._pipes);
+        null, this._tView, this._template, context, this._renderer, this._directives, this._pipes, this._queries);
     return addDestroyable(new EmbeddedViewRef(viewNode, this._template, context));
   }
 }
