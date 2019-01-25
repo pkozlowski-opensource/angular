@@ -8,12 +8,12 @@
 
 import {DomElementSchemaRegistry, ElementSchemaRegistry, ResourceLoader, UrlResolver} from '@angular/compiler';
 import {MockResourceLoader, MockSchemaRegistry} from '@angular/compiler/testing';
-import {AfterContentChecked, AfterContentInit, AfterViewChecked, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ContentChild, DebugElement, Directive, DoCheck, EventEmitter, HostBinding, Inject, Injectable, Input, OnChanges, OnDestroy, OnInit, Output, Pipe, PipeTransform, Provider, RenderComponentType, Renderer, RendererFactory2, RootRenderer, SimpleChange, SimpleChanges, TemplateRef, Type, ViewChild, ViewContainerRef, WrappedValue} from '@angular/core';
+import {AfterContentChecked, AfterContentInit, AfterViewChecked, AfterViewInit, ChangeDetectionStrategy, ChangeDetectorRef, Component, ContentChild, DebugElement, Directive, DoCheck, EventEmitter, HostBinding, Injectable, Input, OnChanges, OnDestroy, OnInit, Output, Pipe, PipeTransform, Provider, RendererFactory2, SimpleChange, SimpleChanges, TemplateRef, Type, ViewChild, ViewContainerRef, WrappedValue} from '@angular/core';
 import {ComponentFixture, TestBed, fakeAsync} from '@angular/core/testing';
 import {By} from '@angular/platform-browser/src/dom/debug/by';
 import {getDOM} from '@angular/platform-browser/src/dom/dom_adapter';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
-import {fixmeIvy, ivyEnabled, modifiedInIvy, onlyInIvy} from '@angular/private/testing';
+import {fixmeIvy, ivyEnabled, modifiedInIvy, obsoleteInIvy, onlyInIvy} from '@angular/private/testing';
 
 export function createUrlResolverWithoutPackagePrefix(): UrlResolver {
   return new UrlResolver();
@@ -97,7 +97,9 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
           OrderCheckDirective0,
           OrderCheckDirective1,
           Gh9882,
+          Gh15634,
           Uninitialized,
+          Initialized,
           Person,
           PersonHolder,
           PersonHolderHolder,
@@ -1225,7 +1227,8 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
                     .toThrowError(/Previous value: '1'\. Current value: '2'/g);
               }));
 
-      fixmeIvy('FW-831: Views created in a cd hooks throw in view engine')
+      obsoleteInIvy(
+          'ivy fixes https://github.com/angular/angular/issues/15634 (view creation from CD hooks)')
           .it('should warn when the view has been created in a cd hook', fakeAsync(() => {
                 const ctx = createCompFixture('<div *gh9882>{{ a }}</div>', TestData);
                 ctx.componentInstance.a = 1;
@@ -1233,6 +1236,34 @@ const TEST_COMPILER_PROVIDERS: Provider[] = [
                     .toThrowError(
                         /It seems like the view has been created after its parent and its children have been dirty checked/);
               }));
+
+      onlyInIvy(
+          'ivy fixes https://github.com/angular/angular/issues/15634 (view creation from CD hooks)') &&
+          it('should allow non-change detected views insertion in a cd hook', fakeAsync(() => {
+               const ctx = createCompFixture('<div *gh9882>{{ a }}</div>', TestData);
+
+               ctx.componentInstance.a = 1;
+               ctx.detectChanges();
+               expect(ctx.nativeElement).toHaveText('1')
+
+               ctx.detectChanges();
+               expect(ctx.nativeElement).toHaveText('1');
+
+               ctx.componentInstance.a = 2;
+               ctx.detectChanges();
+               expect(ctx.nativeElement).toHaveText('2');
+             }));
+
+      it('should allow change detected views insertion in a cd hook', fakeAsync(() => {
+           const ctx = createCompFixture('<div *gh15634>{{ value }}</div>', Initialized);
+
+           ctx.detectChanges();
+           expect(ctx.nativeElement).toHaveText('some');
+
+           ctx.componentInstance.value = 'other';
+           ctx.detectChanges();
+           expect(ctx.nativeElement).toHaveText('other');
+         }));
 
       it('should not throw when two arrays are structurally the same', fakeAsync(() => {
            const ctx = _bindSimpleValue('a', TestData);
@@ -1869,6 +1900,22 @@ class Gh9882 implements AfterContentInit {
   ngAfterContentInit(): any { this._viewContainer.createEmbeddedView(this._templateRef); }
 }
 
+@Directive({selector: '[gh15634]'})
+class Gh15634 implements OnInit {
+  constructor(private _viewContainer: ViewContainerRef, private _templateRef: TemplateRef<Object>) {
+  }
+
+  ngOnInit(): any {
+    const embeddedView = this._templateRef.createEmbeddedView({});
+
+    // explicitly detect changes on this view so it is inserted in the non-dirty state
+    embeddedView.detectChanges();
+
+    // insert view that is already dirty-checked
+    this._viewContainer.insert(embeddedView);
+  }
+}
+
 @Directive({selector: '[testDirective]', exportAs: 'testDirective'})
 class TestDirective implements OnInit, DoCheck, OnChanges, AfterContentInit, AfterContentChecked,
     AfterViewInit, AfterViewChecked, OnDestroy {
@@ -2065,17 +2112,14 @@ class Uninitialized {
 }
 
 @Component({selector: 'root', template: 'empty'})
-class TestData {
-  a: any;
-  b: any;
+class Initialized {
+  value = 'some';
 }
 
 @Component({selector: 'root', template: 'empty'})
-class TestDataWithGetter {
-  // TODO(issue/24571): remove '!'.
-  public fn !: Function;
-
-  get a() { return this.fn(); }
+class TestData {
+  a: any;
+  b: any;
 }
 
 class Holder<T> {
