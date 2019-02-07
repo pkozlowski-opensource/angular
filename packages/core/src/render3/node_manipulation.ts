@@ -358,6 +358,15 @@ export function removeView(
     lContainer: LContainer, containerHost: TElementNode | TContainerNode | TElementContainerNode,
     removeIndex: number) {
   const view = lContainer[VIEWS][removeIndex];
+  if (!view) {
+    throw 'No view at index';
+  }
+  if (!(view[FLAGS] & LViewFlags.Attached)) {
+    throw 'Detached views should not be part of any container';
+  }
+  if (view[FLAGS] & LViewFlags.Destroyed) {
+    throw 'Destroyed views should not be part of any container';
+  }
   detachView(lContainer, removeIndex, !!containerHost.detached);
   destroyLView(view);
 }

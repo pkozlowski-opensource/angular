@@ -6,7 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Attribute, ChangeDetectionStrategy, ChangeDetectorRef, Component, ComponentFactoryResolver, DebugElement, Directive, ElementRef, EmbeddedViewRef, Host, Inject, InjectionToken, Injector, Input, NgModule, Optional, Pipe, PipeTransform, Provider, Self, SkipSelf, TemplateRef, Type, ViewContainerRef} from '@angular/core';
+import {Attribute, ChangeDetectionStrategy, ChangeDetectorRef, Component, ComponentFactoryResolver, ContentChildren, DebugElement, Directive, ElementRef, EmbeddedViewRef, Host, Inject, InjectionToken, Injector, Input, NgModule, OnDestroy, OnInit, Optional, Pipe, PipeTransform, Provider, Self, SkipSelf, TemplateRef, Type, ViewContainerRef} from '@angular/core';
+import {QueryList} from '@angular/core/src/core';
 import {ComponentFixture, TestBed, fakeAsync} from '@angular/core/testing';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
 import {ivyEnabled, modifiedInIvy, obsoleteInIvy, onlyInIvy} from '@angular/private/testing';
@@ -1050,6 +1051,69 @@ describe('View injector', () => {
 
       // This test will fail if the ngOnInit of ComponentThatLoadsAnotherComponentThenMovesIt
       // throws an error.
+    });
+
+    it('should not try to destroy the same view several times', () => {
+
+      @Directive({selector: '[with-on-destroy]'})
+      class DirectiveWithNgDestroy implements OnDestroy {
+        destroyed = false;
+
+        ngOnDestroy() {
+          console.log('destroying DirectiveWithNgDestroy');
+          if (this.destroyed) {
+            throw 'Already destroyed'
+          } else {
+            this.destroyed = true;
+          }
+        }
+      }
+
+      @Directive({selector: '[inserting-views]'})
+      class DirectiveInsertingViews implements OnInit, OnDestroy {
+        constructor(private vcRef: ViewContainerRef, private tplRef: TemplateRef<{}>) {}
+
+        ngOnInit(): void { this.vcRef.createEmbeddedView(this.tplRef); }
+
+        ngOnDestroy() {
+          console.log('destroying DirectiveInsertingViews');
+          debugger;
+          this.vcRef.clear();
+        }
+      }
+
+      @Component({selector: 'with-query', template: ``})
+      class WithQueryComponent {
+        @ContentChildren('q', {descendants: true}) q: QueryList<ElementRef>|null = null;
+      }
+
+      // TODO(pk): can I reuse an existing class?
+      @Component({
+        selector: 'test',
+        template: `
+          <with-query>
+            <ng-template [ngIf]="show">
+              <div #q><!-- this div is here only because removing it uncovers another bug -->
+                <ng-template inserting-views><div #q with-on-destroy></div></ng-template>
+              </div>
+            </ng-template>
+          </with-query>
+      `
+      })
+      class TestComponent {
+        show = true;
+      }
+
+      TestBed.configureTestingModule({
+        declarations:
+            [TestComponent, DirectiveInsertingViews, DirectiveWithNgDestroy, WithQueryComponent]
+      });
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+
+      fixture.componentInstance.show = false;
+      fixture.detectChanges();
     });
   });
 });
