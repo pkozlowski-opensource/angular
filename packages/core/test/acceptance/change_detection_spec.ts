@@ -7,7 +7,7 @@
  */
 
 
-import {ApplicationRef, Component, Directive, EmbeddedViewRef, TemplateRef, ViewContainerRef} from '@angular/core';
+import {ApplicationRef, ChangeDetectorRef, Component, Directive, EmbeddedViewRef, TemplateRef, ViewChild, ViewContainerRef} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
 
@@ -64,6 +64,60 @@ describe('change detection', () => {
       fixture.detectChanges();
 
       expect(viewRef.rootNodes[0]).toHaveText('change-detected');
+    });
+
+  });
+
+  describe('detached embedded views', () => {
+
+    it('should change-detect projected view when the declaration place is change-detected', () => {
+      @Component(
+          {selector: 'view-inserting', template: `<ng-template #insertionPoint></ng-template>`})
+      class ViewInsertingCmp {
+        @ViewChild('insertionPoint', {read: ViewContainerRef})
+        _vcRef !: ViewContainerRef;
+
+        constructor(private _cdRef: ChangeDetectorRef) {}
+
+        insert(tpl: TemplateRef<{}>): void { this._vcRef.createEmbeddedView(tpl); }
+
+        detachFromCDTree() { this._cdRef.detach(); }
+      }
+
+      @Component({
+        selector: 'test-cmpt',
+        template: `
+          <ng-template #declaredTpl>{{counter}}</ng-template>    
+          <view-inserting #vi></view-inserting>      
+        `
+      })
+      class TestCmpt {
+        counter = 0;
+      }
+
+
+      TestBed.configureTestingModule({declarations: [ViewInsertingCmp, TestCmpt]});
+
+      const fixture = TestBed.createComponent(TestCmpt);
+      const tpl = fixture.debugElement.childNodes[0].references['declaredTpl'] as TemplateRef<{}>;
+      const viCmpt = fixture.debugElement.childNodes[1].references['vi'] as ViewInsertingCmp;
+
+      // call initial detect changes so view query in the ViewInsertingCmp gets resolved
+      fixture.detectChanges();
+      expect(fixture.nativeElement).toHaveText('');
+
+      // call insert an embedded view (declaration and insertion points are different) and change
+      // detect the entire tree (both declaration and insertion point are dirty checked)
+      viCmpt.insert(tpl);
+      fixture.detectChanges();
+      expect(fixture.nativeElement).toHaveText('0');
+
+      // now detach the insertion point from the CD tree but notice that the inserted view is still
+      // change-detected (since its declaration point is change-detected)
+      fixture.componentInstance.counter = 1;
+      viCmpt.detachFromCDTree();
+      fixture.detectChanges();
+      expect(fixture.nativeElement).toHaveText('1');
     });
 
   });
