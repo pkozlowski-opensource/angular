@@ -717,6 +717,10 @@ export function nativeRemoveNode(renderer: Renderer3, rNode: RNode, isHostElemen
   }
 }
 
+function getComponentProjectableNodes(componentView: LView, selectorIndex: number): TNode|null {
+  return ((componentView[T_HOST] as TElementNode).projection as(TNode | null)[])[selectorIndex];
+}
+
 /**
  * Appends nodes to a target projection place. Nodes to insert were previously re-distribution and
  * stored on a component host level.
@@ -729,27 +733,36 @@ export function nativeRemoveNode(renderer: Renderer3, rNode: RNode, isHostElemen
 export function appendProjectedNodes(
     lView: LView, tProjectionNode: TProjectionNode, selectorIndex: number,
     componentView: LView): void {
-  const projectedView = componentView[PARENT] !as LView;
-  const componentNode = componentView[T_HOST] as TElementNode;
-  let nodeToProject = (componentNode.projection as(TNode | null)[])[selectorIndex];
+  let nodeToProject = getComponentProjectableNodes(componentView, selectorIndex);
+  let projectionNodeStackTopIdx = -1;
 
-  if (Array.isArray(nodeToProject)) {
-    appendChild(nodeToProject, tProjectionNode, lView);
-  } else {
-    while (nodeToProject) {
-      if (nodeToProject.type === TNodeType.Projection) {
-        appendProjectedNodes(
-            lView, tProjectionNode, (nodeToProject as TProjectionNode).projection,
-            findComponentView(projectedView));
-      } else {
-        // This flag must be set now or we won't know that this node is projected
-        // if the nodes are inserted into a container later.
-        nodeToProject.flags |= TNodeFlags.isProjected;
-        appendProjectedNode(nodeToProject, tProjectionNode, lView, projectedView);
-      }
+  while (nodeToProject) {
+    if (Array.isArray(nodeToProject)) {
+      appendChild(nodeToProject, tProjectionNode, lView);
+      nodeToProject = null;
+    } else if (nodeToProject.type === TNodeType.Projection) {
+      projectionNodeStack[++projectionNodeStackTopIdx] = componentView;
+      projectionNodeStack[++projectionNodeStackTopIdx] = nodeToProject;
+      componentView = findComponentView(componentView[PARENT] !as LView)
+      nodeToProject = getComponentProjectableNodes(
+          componentView, (nodeToProject as TProjectionNode).projection);
+    } else {
+      // This flag must be set now or we won't know that this node is projected
+      // if the nodes are inserted into a container later.
+      nodeToProject.flags |= TNodeFlags.isProjected;
+      appendProjectedNode(nodeToProject, tProjectionNode, lView, componentView[PARENT] !as LView);
       nodeToProject = nodeToProject.next;
     }
+
+    if (!nodeToProject) {
+      nodeToProject = projectionNodeStack[projectionNodeStackTopIdx--] as TNode;
+      componentView = projectionNodeStack[projectionNodeStackTopIdx--] as LView;
+      nodeToProject = nodeToProject ? nodeToProject.next : null;
+    }
   }
+
+  // cleanup stack
+  projectionNodeStack.length = 0;
 }
 
 /**
