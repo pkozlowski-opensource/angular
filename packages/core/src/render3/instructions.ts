@@ -37,9 +37,10 @@ import {SanitizerFn} from './interfaces/sanitization';
 import {StylingContext} from './interfaces/styling';
 import {BINDING_INDEX, CHILD_HEAD, CHILD_TAIL, CLEANUP, CONTEXT, DECLARATION_VIEW, ExpandoInstructions, FLAGS, HEADER_OFFSET, HOST, INJECTOR, InitPhaseState, LView, LViewFlags, NEXT, OpaqueViewState, PARENT, QUERIES, RENDERER, RENDERER_FACTORY, RootContext, RootContextFlags, SANITIZER, TData, TVIEW, TView, T_HOST} from './interfaces/view';
 import {assertNodeOfPossibleTypes, assertNodeType} from './node_assert';
-import {appendChild, appendProjectedNodes, createTextNode, insertView, removeView} from './node_manipulation';
+import {appendChild, createTextNode, getNativeAnchorNode, getRenderParent, insertChildBefore, insertView, removeView} from './node_manipulation';
 import {isNodeMatchingSelectorList, matchingSelectorIndex} from './node_selector_matcher';
 import {applyOnCreateInstructions} from './node_util';
+import {project} from './project';
 import {decreaseElementDepthCount, enterView, getBindingsEnabled, getCheckNoChangesMode, getContextLView, getCurrentDirectiveDef, getElementDepthCount, getIsParent, getLView, getPreviousOrParentTNode, increaseElementDepthCount, isCreationMode, leaveView, nextContextImpl, resetComponentState, setBindingRoot, setCheckNoChangesMode, setCurrentDirectiveDef, setCurrentQueryIndex, setIsParent, setPreviousOrParentTNode} from './state';
 import {getInitialClassNameValue, getInitialStyleStringValue, initializeStaticContext as initializeStaticStylingContext, patchContextWithStaticAttrs, renderInitialClasses, renderInitialStyles, renderStyling, updateClassProp as updateElementClassProp, updateContextWithBindings, updateStyleProp as updateElementStyleProp, updateStylingMap} from './styling/class_and_style_bindings';
 import {BoundPlayerFactory} from './styling/player_factory';
@@ -47,7 +48,7 @@ import {ANIMATION_PROP_PREFIX, allocateDirectiveIntoContext, createEmptyStylingC
 import {NO_CHANGE} from './tokens';
 import {INTERPOLATION_DELIMITER, renderStringify} from './util/misc_utils';
 import {findComponentView, getLViewParent, getRootContext, getRootView} from './util/view_traversal_utils';
-import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isRootView, loadInternal, readPatchedLView, unwrapRNode} from './util/view_utils';
+import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isLContainer, isRootView, loadInternal, readPatchedLView, unwrapRNode} from './util/view_utils';
 
 
 
@@ -271,6 +272,8 @@ export function assignTViewNodeToLView(
   // View nodes are not stored in data because they can be added / removed at runtime (which
   // would cause indices to change). Their TNodes are instead stored in tView.node.
   let tNode = tView.node;
+
+  // TODO(benlesh): the coerced equality assertion here seems off.
   if (tNode == null) {
     ngDevMode && tParentNode &&
         assertNodeOfPossibleTypes(tParentNode, TNodeType.Element, TNodeType.Container);
@@ -391,28 +394,28 @@ export function createEmbeddedViewAndNode<T>(
  * can't store TViews in the template function itself (as we do for comps). Instead, we store the
  * TView for dynamically created views on their host TNode, which only has one instance.
  */
-export function renderEmbeddedTemplate<T>(viewToRender: LView, tView: TView, context: T) {
+export function renderEmbeddedTemplate<T>(lViewToRender: LView, tView: TView, context: T) {
   const _isParent = getIsParent();
   const _previousOrParentTNode = getPreviousOrParentTNode();
   let oldView: LView;
-  if (viewToRender[FLAGS] & LViewFlags.IsRoot) {
+  if (lViewToRender[FLAGS] & LViewFlags.IsRoot) {
     // This is a root view inside the view tree
-    tickRootContext(getRootContext(viewToRender));
+    tickRootContext(getRootContext(lViewToRender));
   } else {
     try {
       setIsParent(true);
       setPreviousOrParentTNode(null !);
 
-      oldView = enterView(viewToRender, viewToRender[T_HOST]);
+      oldView = enterView(lViewToRender, lViewToRender[T_HOST]);
       namespaceHTML();
-      tView.template !(getRenderFlags(viewToRender), context);
+      tView.template !(getRenderFlags(lViewToRender), context);
       // This must be set to false immediately after the first creation run because in an
       // ngFor loop, all the views will be created together before update mode runs and turns
       // off firstTemplatePass. If we don't set it here, instances will perform directive
       // matching, etc again and again.
-      viewToRender[TVIEW].firstTemplatePass = false;
+      lViewToRender[TVIEW].firstTemplatePass = false;
 
-      refreshDescendantViews(viewToRender);
+      refreshDescendantViews(lViewToRender);
     } finally {
       leaveView(oldView !);
       setIsParent(_isParent);
@@ -1342,7 +1345,6 @@ function savePropertyDebugData(
  * @param adjustedIndex The index of the TNode in TView.data, adjusted for HEADER_OFFSET
  * @param tagName The tag name of the node
  * @param attrs The attributes defined on this node
- * @param tViews Any TViews attached to this node
  * @returns the TNode object
  */
 export function createTNode(
@@ -2221,7 +2223,7 @@ export function createLContainer(
     isForViewContainerRef ? -1 : 0,  // active index
     currentView,                     // parent
     null,                            // next
-    null,                            // queries
+    currentView[QUERIES],            // queries | Grab current queries. (TODO: remove me)
     [],                              // views
     native,                          // native
   ];
@@ -2259,6 +2261,10 @@ export function template(
     tContainerNode.tViews = createTView(
         -1, templateFn, consts, vars, tView.directiveRegistry, tView.pipeRegistry, null, null);
   }
+  // TODO(misko): we should capture the current LQueries here so that we can refer to them when we
+  // instantiate the template. Using the Container as a storage mechanism for queries is wrong.
+  // Container should not know about queries, since it is always the declaration query which matter
+  // not the insertion.
 
   createDirectivesAndLocals(tView, lView, localRefs, localRefExtractor);
   addTContainerToQueries(lView, tContainerNode);
@@ -2297,9 +2303,12 @@ function containerInternal(
   const comment = lView[RENDERER].createComment(ngDevMode ? 'container' : '');
   ngDevMode && ngDevMode.rendererCreateComment++;
   const tNode = createNodeAtIndex(index, TNodeType.Container, comment, tagName, attrs);
-  const lContainer = lView[adjustedIndex] = createLContainer(lView[adjustedIndex], lView, comment);
+  const lContainer = lView[adjustedIndex] =
+      createLContainer(lView[adjustedIndex], lView, comment, false);
 
-  appendChild(comment, tNode, lView);
+  const parentTNode: TNode = tNode.parent || lView[T_HOST] !;
+  const anchorNode = getNativeAnchorNode(parentTNode, lView);
+  insertChildBefore(comment, tNode, lView, anchorNode);
 
   // Containers are added to the current view tree instead of their embedded views
   // because views can be removed and re-inserted.
@@ -2380,19 +2389,21 @@ export function containerRefreshEnd(): void {
  * by executing an associated template function.
  */
 function refreshDynamicEmbeddedViews(lView: LView) {
-  for (let current = lView[CHILD_HEAD]; current !== null; current = current[NEXT]) {
+  let current = lView[CHILD_HEAD];
+  while (current) {
     // Note: current can be an LView or an LContainer instance, but here we are only interested
     // in LContainer. We can tell it's an LContainer because its length is less than the LView
     // header.
-    if (current.length < HEADER_OFFSET && current[ACTIVE_INDEX] === -1) {
-      const container = current as LContainer;
-      for (let i = 0; i < container[VIEWS].length; i++) {
-        const dynamicViewData = container[VIEWS][i];
+    if (isLContainer(current) && current[ACTIVE_INDEX] === -1) {
+      const views = current[VIEWS];
+      for (let i = 0; i < views.length; i++) {
+        const dynamicViewData = views[i];
         // The directives and pipes are not needed here as an existing view is only being refreshed.
         ngDevMode && assertDefined(dynamicViewData[TVIEW], 'TView must be allocated');
         renderEmbeddedTemplate(dynamicViewData, dynamicViewData[TVIEW], dynamicViewData[CONTEXT] !);
       }
     }
+    current = current[NEXT];
   }
 }
 
@@ -2642,12 +2653,18 @@ export function projection(nodeIndex: number, selectorIndex: number = 0, attrs?:
 
   // We can't use viewData[HOST_NODE] because projection nodes can be nested in embedded views.
   if (tProjectionNode.projection === null) tProjectionNode.projection = selectorIndex;
+  ngDevMode &&
+      assertEqual(selectorIndex, tProjectionNode.projection, 'selectorIndex must match projection');
 
   // `<ng-content>` has no content
   setIsParent(false);
 
   // re-distribution of projectable nodes is stored on a component's view level
-  appendProjectedNodes(lView, tProjectionNode, selectorIndex, findComponentView(lView));
+  // appendProjectedNodes(lView, tProjectionNode, selectorIndex, findComponentView(lView));
+
+  const renderParent = getRenderParent(tProjectionNode, lView);
+
+  project(lView, tProjectionNode, null, renderParent);
 }
 
 /**
@@ -2657,7 +2674,6 @@ export function projection(nodeIndex: number, selectorIndex: number = 0, attrs?:
  * and call onDestroy callbacks.
  *
  * @param lView The view where LView or LContainer should be added
- * @param adjustedHostIndex Index of the view's host node in LView[], adjusted for header
  * @param lViewOrLContainer The LView or LContainer to add to the view tree
  * @returns The state passed in
  */

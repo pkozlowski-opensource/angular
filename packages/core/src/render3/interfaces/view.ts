@@ -48,14 +48,39 @@ export const DECLARATION_VIEW = 17;
 /** Size of LView's header. Necessary to adjust for it when setting slots.  */
 export const HEADER_OFFSET = 19;
 
-
-// This interface replaces the real LView interface if it is an arg or a
-// return value of a public instruction. This ensures we don't need to expose
-// the actual interface, which should be kept private.
-export interface OpaqueViewState {
-  '__brand__': 'Brand for OpaqueViewState that nothing will match';
+/**
+ *
+ */
+export interface View<T extends{} = {}> {
+  __ng_brand__: 'Angular opaque reference representing a View. DO NOT READ/MANIPULATE!';
 }
 
+/**
+ *
+ */
+export interface ViewContainer {
+  __ng_brand__: 'Angular opaque reference representing a ViewContainer. DO NOT READ/MANIPULATE!';
+}
+
+// TODO: get rid of this.
+export type OpaqueViewState = View;
+
+/**
+ *
+ */
+export interface EmbeddedViewFactory<T extends{}> {
+  /**
+   * @param context
+   */
+  (context: T): View<T>;
+}
+
+export interface EmbeddedViewFactoryInternal<T extends{}> {
+  /**
+   * @param context
+   */
+  (context: T): LView;
+}
 
 /**
  * `LView` stores all of the information needed to process the instructions as
@@ -346,7 +371,7 @@ export interface TView {
    * If this is a `TElementNode`, this is the view of a root component. It has exactly one
    * root TNode.
    *
-   * If this is null, this is the view of a component that is not at root. We do not store
+   * If this is `null`, this is the view of a component that is not at root. We do not store
    * the host TNodes for child component views because they can potentially have several
    * different host TNodes, depending on where the component is being used. These host
    * TNodes cannot be shared (due to different indices, etc).
