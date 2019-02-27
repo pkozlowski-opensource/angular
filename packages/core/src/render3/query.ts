@@ -173,6 +173,7 @@ function copyQueriesToView(query: LQuery<any>| null): LQuery<any>|null {
 function insertView(index: number, query: LQuery<any>| null) {
   while (query) {
     ngDevMode && assertViewQueryhasPointerToDeclarationContainer(query);
+    debugger;
     query.containerValues !.splice(index, 0, query.values);
 
     // mark a query as dirty only when inserted view had matching modes

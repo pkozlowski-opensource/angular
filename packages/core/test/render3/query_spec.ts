@@ -1602,6 +1602,7 @@ describe('query', () => {
          });
 
       // https://stackblitz.com/edit/angular-7vvo9j?file=src%2Fapp%2Fapp.component.ts
+      // https://stackblitz.com/edit/angular-xzwp6n
       it('should report results when the same TemplateRef is inserted into different ViewContainerRefs',
          () => {
            let tpl: TemplateRef<{}>;
@@ -1669,8 +1670,8 @@ describe('query', () => {
            fixture.update();
            expect(qList.length).toBe(2);
            let qListArr = qList.toArray();
-           expect(qListArr[0].nativeElement.getAttribute('id')).toBe('foo_1_0');
-           expect(qListArr[1].nativeElement.getAttribute('id')).toBe('foo_0_0');
+           expect(qListArr[0].nativeElement.getAttribute('id')).toBe('foo_0_0');
+           expect(qListArr[1].nativeElement.getAttribute('id')).toBe('foo_1_0');
 
            directiveInstances[0].remove();
            fixture.update();

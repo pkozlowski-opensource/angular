@@ -38,7 +38,7 @@ export class ViewRef<T> implements viewEngine_EmbeddedViewRef<T>, viewEngine_Int
   /**
    * @internal
    */
-  public _lView: LView;
+  public _lView: LView;  // TODO(misko): this should be View (not LView)
 
   get rootNodes(): any[] {
     if (this._lView[HOST] == null) {

@@ -9,7 +9,8 @@
 import {SRCSET_ATTRS, URI_ATTRS, VALID_ATTRS, VALID_ELEMENTS, getTemplateContent} from '../sanitization/html_sanitizer';
 import {InertBodyHelper} from '../sanitization/inert_body';
 import {_sanitizeUrl, sanitizeSrcset} from '../sanitization/url_sanitizer';
-import {assertDefined, assertEqual, assertGreaterThan} from '../util/assert';
+import {assertDefined, assertDomNode, assertEqual, assertGreaterThan, isDomNode} from '../util/assert';
+
 import {attachPatchData} from './context_discovery';
 import {allocExpando, createNodeAtIndex, elementAttribute, load, textBinding} from './instructions';
 import {LContainer, NATIVE} from './interfaces/container';
@@ -19,7 +20,7 @@ import {RComment, RElement, RText} from './interfaces/renderer';
 import {SanitizerFn} from './interfaces/sanitization';
 import {StylingContext} from './interfaces/styling';
 import {BINDING_INDEX, HEADER_OFFSET, LView, RENDERER, TVIEW, TView, T_HOST} from './interfaces/view';
-import {appendChild, createTextNode, nativeRemoveNode} from './node_manipulation';
+import {createTextNode, getNativeAnchorNode, insertChildBefore, nativeRemoveNode} from './node_manipulation';
 import {getIsParent, getLView, getPreviousOrParentTNode, setIsParent, setPreviousOrParentTNode} from './state';
 import {NO_CHANGE} from './tokens';
 import {addAllToArray} from './util/array_utils';
@@ -497,12 +498,14 @@ function appendI18nNode(tNode: TNode, parentTNode: TNode, previousTNode: TNode |
     cursor = cursor.next;
   }
 
-  appendChild(getNativeByTNode(tNode, viewData), tNode, viewData);
+  const anchorNode = getNativeAnchorNode(parentTNode, viewData);
+
+  insertChildBefore(getNativeByTNode(tNode, viewData), tNode, viewData, anchorNode);
 
   const slotValue = viewData[tNode.index];
   if (tNode.type !== TNodeType.Container && isLContainer(slotValue)) {
     // Nodes that inject ViewContainerRef also have a comment node that should be moved
-    appendChild(slotValue[NATIVE], tNode, viewData);
+    insertChildBefore(slotValue[NATIVE], tNode, viewData, anchorNode);
   }
   return tNode;
 }
@@ -674,6 +677,7 @@ function createDynamicNodeAtIndex(
     index: number, type: TNodeType, native: RElement | RText | null,
     name: string | null): TElementNode|TIcuContainerNode {
   const previousOrParentTNode = getPreviousOrParentTNode();
+  ngDevMode && assertDefined(previousOrParentTNode, 'parent TNode required');
   const tNode = createNodeAtIndex(index, type as any, native, name, null);
 
   // We are creating a dynamic node, the previous tNode might not be pointing at this node.
@@ -883,7 +887,8 @@ function readUpdateOpCodes(
 function removeNode(index: number, viewData: LView) {
   const removedPhTNode = getTNode(index, viewData);
   const removedPhRNode = getNativeByIndex(index, viewData);
-  if (removedPhRNode) {
+  if (isDomNode(removedPhRNode)) {
+    ngDevMode && assertDomNode(removedPhRNode);
     nativeRemoveNode(viewData[RENDERER], removedPhRNode);
   }
 

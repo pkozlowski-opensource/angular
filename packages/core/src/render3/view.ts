@@ -10,8 +10,8 @@ import {assertDomNode, assertEqual} from '../util/assert';
 
 import {assertLContainer, assertLView, assertLViewOrUndefined} from './assert';
 import {getLContext} from './context_discovery';
-import {addToViewTree, assignTViewNodeToLView, createLContainer, createLView, renderEmbeddedTemplate} from './instructions';
-import {LContainer, VIEWS} from './interfaces/container';
+import {appendChildView, appendChildViewDynamic, assignTViewNodeToLView, createLContainer, createLView, renderEmbeddedTemplate} from './instructions';
+import {ACTIVE_INDEX, LContainer, VIEWS} from './interfaces/container';
 import {TNode, TNodeType, TProjectionNode, TViewNode} from './interfaces/node';
 import {LQueries} from './interfaces/query';
 import {RComment, RElement, RNode} from './interfaces/renderer';
@@ -109,7 +109,7 @@ export function getViewContainer<T extends{} = {}>(node: RNode): ViewContainer|n
       lContainer = lView[nodeIndex] = createLContainer(
           lViewContainerOrElement as RElement | RComment, lView,
           lViewContainerOrElement as RComment, true);
-      addToViewTree(lView, lContainer);
+      appendChildViewDynamic(lView, lContainer);
     }
   }
   return lContainer as ViewContainer | null;
@@ -131,7 +131,11 @@ export function viewContainerInsertAfter(
 function viewContainerInsertAfterInternal(
     lContainer: LContainer, lView: LView, insertAfterLView: LView | null) {
   const containerNode = unwrapRNode(lContainer[HOST]);
-  // const node = readElementValue(lView[HOST]);
+
+  // Because we're dynamically adding a view to the container, we reset the ACTIVE_INDEX to ensure
+  // the container is updated.
+  lContainer[ACTIVE_INDEX] = -1;
+
   const insertAfterNode =
       insertAfterLView ? getLastRootElementFromView(insertAfterLView) : containerNode;
   ngDevMode && assertDomNode(insertAfterNode);
@@ -245,9 +249,11 @@ export function viewContainerRemoveInternal(
       const renderer = lView[RENDERER];
       while (tNode) {
         const rNode = getRNode(lView, tNode.index);
-        const parentRElement = nativeParentNode(renderer, rNode);
-        if (parentRElement) {
-          nativeRemoveChild(renderer, parentRElement, rNode);
+        if (rNode) {
+          const parentRElement = nativeParentNode(renderer, rNode);
+          if (parentRElement) {
+            nativeRemoveChild(renderer, parentRElement, rNode);
+          }
         }
         tNode = tNode.next;
       }

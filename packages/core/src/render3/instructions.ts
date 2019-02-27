@@ -18,7 +18,7 @@ import {assertDataInRange, assertDefined, assertDomNode, assertEqual, assertLess
 import {isObservable} from '../util/lang';
 import {normalizeDebugBindingName, normalizeDebugBindingValue} from '../util/ng_reflect';
 
-import {assertHasParent, assertLContainerOrUndefined, assertLView, assertPreviousIsParent} from './assert';
+import {assertHasParent, assertLContainer, assertLContainerOrUndefined, assertLView, assertPreviousIsParent} from './assert';
 import {bindingUpdated, bindingUpdated2, bindingUpdated3, bindingUpdated4} from './bindings';
 import {attachPatchData, getComponentViewByInstance} from './context_discovery';
 import {attachLContainerDebug, attachLViewDebug} from './debug';
@@ -48,7 +48,7 @@ import {ANIMATION_PROP_PREFIX, allocateDirectiveIntoContext, createEmptyStylingC
 import {NO_CHANGE} from './tokens';
 import {INTERPOLATION_DELIMITER, renderStringify} from './util/misc_utils';
 import {findComponentView, getLViewParent, getRootContext, getRootView} from './util/view_traversal_utils';
-import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isLContainer, isRootView, loadInternal, readPatchedLView, unwrapRNode} from './util/view_utils';
+import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isLContainer, isLView, isRootView, loadInternal, readPatchedLView, unwrapRNode} from './util/view_utils';
 
 
 
@@ -429,7 +429,7 @@ export function renderEmbeddedTemplate<T>(lViewToRender: LView, tView: TView, co
  * Will get the next level up if level is not specified.
  *
  * This is used to save contexts of parent views so they can be bound in embedded views, or
- * in conjunction with reference() to bind a ref from a parent view.
+ * in conjunction with {@link reference} to bind a ref from a parent view.
  *
  * @param level The relative level of the view from which to grab context compared to contextVewData
  * @returns context
@@ -2103,7 +2103,7 @@ function addComponentLogic<T>(
   // Only component views should be added to the view tree directly. Embedded views are
   // accessed through their containers because they may be removed / re-added later.
   const rendererFactory = lView[RENDERER_FACTORY];
-  const componentView = addToViewTree(
+  const componentView = appendChildView(
       lView, createLView(
                  lView, tView, null, def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways,
                  lView[previousOrParentTNode.index], previousOrParentTNode as TElementNode,
@@ -2234,9 +2234,31 @@ export function createLContainer(
 /**
  * Creates an LContainer for an ng-template (dynamically-inserted view), e.g.
  *
+ * ```html
  * <ng-template #foo>
  *    <div></div>
  * </ng-template>
+ * ```
+ *
+ * Note that when used in conjunction with the {@link reference} instruction, you must allocate two
+ * indices for any template retrieved via `reference`. For example `template(1, ....)` must be
+ * retrieved via `reference(2)`, there for an element that follows that template must have an index
+ * of `3`.
+ *
+ * ```ts
+ * function (rf: RenderFlags, ctx: any) {
+ *  if (rf === RenderFlags.Create) {
+ *    elementStart(0, 'div');
+ *    template(1, someTemplate, 0, 0);
+ *    element(3, 'button');
+ *    elementEnd();
+ *  }
+ *  if (rf === RenderFlags.Update) {
+ *    someRef = reference(2); // reference to template(1, ...)
+ *  }
+ * }
+ * ```
+ *
  *
  * @param index The index of the container in the data array
  * @param templateFn Inline template
@@ -2312,7 +2334,7 @@ function containerInternal(
 
   // Containers are added to the current view tree instead of their embedded views
   // because views can be removed and re-inserted.
-  addToViewTree(lView, lContainer);
+  appendChildView(lView, lContainer);
 
   ngDevMode && assertNodeType(getPreviousOrParentTNode(), TNodeType.Container);
   return tNode;
@@ -2392,8 +2414,7 @@ function refreshDynamicEmbeddedViews(lView: LView) {
   let current = lView[CHILD_HEAD];
   while (current) {
     // Note: current can be an LView or an LContainer instance, but here we are only interested
-    // in LContainer. We can tell it's an LContainer because its length is less than the LView
-    // header.
+    // in LContainer.
     if (isLContainer(current) && current[ACTIVE_INDEX] === -1) {
       const views = current[VIEWS];
       for (let i = 0; i < views.length; i++) {
@@ -2663,8 +2684,54 @@ export function projection(nodeIndex: number, selectorIndex: number = 0, attrs?:
   // appendProjectedNodes(lView, tProjectionNode, selectorIndex, findComponentView(lView));
 
   const renderParent = getRenderParent(tProjectionNode, lView);
+  const anchorNode = getNativeAnchorNode(tProjectionNode, lView);
 
-  project(lView, tProjectionNode, null, renderParent);
+  project(lView, tProjectionNode, anchorNode, renderParent);
+}
+
+/**
+ * Adds an LContainer as a child to an LView in the dynamic case, where the
+ * view may be added at any point in the DOM tree. This assures that the linked
+ * list of LViews is in the same order as they appear in the DOM, depth first.
+ * @param parentLView the LView to add the child container to
+ * @param lContainerToAdd The container to add to the parent
+ */
+export function appendChildViewDynamic(parentLView: LView, lContainerToAdd: LContainer): void {
+  ngDevMode && assertLView(parentLView);
+  ngDevMode && assertLContainer(lContainerToAdd);
+
+  const anchorElement = lContainerToAdd[HOST];
+  const tView = parentLView[TVIEW];
+
+  const constsEnd = tView.bindingStartIndex;
+  let lastLContainerOrLView: LContainer|LView|null = null;
+
+  for (let i = HEADER_OFFSET; i < constsEnd; i++) {
+    let item = parentLView[i];
+    if (unwrapRNode(item) === anchorElement) {
+      if (!lastLContainerOrLView) {
+        // HEAD
+        if ((lContainerToAdd[NEXT] = parentLView[CHILD_HEAD]) === null) {
+          parentLView[CHILD_TAIL] = lContainerToAdd;
+        }
+        parentLView[CHILD_HEAD] = lContainerToAdd;
+        return;
+      } else if (!lastLContainerOrLView[NEXT]) {
+        // TAIL
+        lastLContainerOrLView[NEXT] = lContainerToAdd;
+        parentLView[CHILD_TAIL] = lContainerToAdd;
+        return;
+      } else {
+        // Middle
+        const _next = lastLContainerOrLView[NEXT];
+        lastLContainerOrLView[NEXT] = lContainerToAdd;
+        lContainerToAdd[NEXT] = _next;
+        return;
+      }
+    } else if (isLContainer(item) || isLView(item)) {
+      lastLContainerOrLView = item;
+    }
+  }
 }
 
 /**
@@ -2677,7 +2744,7 @@ export function projection(nodeIndex: number, selectorIndex: number = 0, attrs?:
  * @param lViewOrLContainer The LView or LContainer to add to the view tree
  * @returns The state passed in
  */
-export function addToViewTree<T extends LView|LContainer>(lView: LView, lViewOrLContainer: T): T {
+export function appendChildView<T extends LView|LContainer>(lView: LView, lViewOrLContainer: T): T {
   // TODO(benlesh/misko): This implementation is incorrect, because it always adds the LContainer to
   // the end of the queue, which means if the developer retrieves the LContainers from RNodes out of
   // order, the change detection will run out of order, as the act of retrieving the the LContainer
@@ -3276,12 +3343,18 @@ export function store<T>(index: number, value: T): void {
 }
 
 /**
- * Retrieves a local reference from the current contextViewData.
+ * Retrieves a local reference from the current context {@link LView}'s data.
  *
  * If the reference to retrieve is in a parent view, this instruction is used in conjunction
- * with a nextContext() call, which walks up the tree and updates the contextViewData instance.
+ * with a call to {@link nextContext}, which walks up the tree and updates the contextViewData
+ * instance.
  *
- * @param index The index of the local ref in contextViewData.
+ * If you're using this to retrieve a reference to a {@link template}, you must allot two indices
+ * for that template, for example, you might pass 3 to the template, `template(3, ...)`, then you'd
+ * use `reference(4)` to get a reference to the template
+ *
+ * @param index The index of the local ref to retrieve, it should be `templateIndex + 1` for any
+ * `template(templateIndex, ...)`.
  */
 export function reference<T>(index: number) {
   const contextLView = getContextLView();

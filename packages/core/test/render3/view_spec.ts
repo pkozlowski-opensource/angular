@@ -12,56 +12,66 @@ import {getEmbeddedViewFactory, viewContainerInsertAfter, getViewContainer, view
 import {CHILD_HEAD, NEXT, CHILD_TAIL} from '@angular/core/src/render3/interfaces/view';
 
 describe('ViewContainer manipulation commands', () => {
-  it('should get the embedded view from a comment added by ng-template and be able to insert it',
-     () => {
-       const log: any[] = [];
-       const fixture = new TemplateFixture(
-           () => {
-             element(0, 'div');
-             template(1, (rf: RenderFlags, ctx: any) => {
-               if (rf & RenderFlags.Create) {
-                 elementStart(0, 'b');
-                 text(1, 'Hello ');
-                 elementEnd();
-                 elementStart(2, 'i');
-                 text(3);
-                 elementEnd();
-               }
-               if (rf & RenderFlags.Update) {
-                 textBinding(3, bind(ctx.name));
-               }
-             }, 4, 1);
-           },
-           () => {
+  it('should get the embedded view from a comment added by ng-template and be able to insert it', () => {
+    /*
+    <div></div>
+    <ng-template>
+      <b>Hello </b>
+      <i>{{name}}</i>
+    </ng-template>
+    */
+    const fixture = new TemplateFixture(
+        () => {
+          element(0, 'div');
+          template(1, (rf: RenderFlags, ctx: any) => {
+            if (rf & RenderFlags.Create) {
+              elementStart(0, 'b');
+              text(1, 'Hello ');
+              elementEnd();
+              elementStart(2, 'i');
+              text(3);
+              elementEnd();
+            }
+            if (rf & RenderFlags.Update) {
+              textBinding(3, bind(ctx.name));
+            }
+          }, 4, 1);
+        },
+        () => {
 
-           },
-           2, 0);
+        },
+        2, 0);
 
-       const comment = fixture.hostElement.lastChild !;
-       expect(comment.nodeType).toBe(Node.COMMENT_NODE);
-       const embeddedViewFactory = getEmbeddedViewFactory(comment) !;
-       expect(typeof embeddedViewFactory).toEqual('function');
+    /*
+    <div></div>
+    <!-- container -->
+    */
+    const comment = fixture.hostElement.lastChild !;
+    expect(comment.nodeType).toBe(Node.COMMENT_NODE);
+    const embeddedViewFactory = getEmbeddedViewFactory(comment) !;
+    expect(typeof embeddedViewFactory).toEqual('function');
 
-       const commentViewContainer = getViewContainer(comment) !;
+    const commentViewContainer = getViewContainer(comment) !;
 
-       const bView = embeddedViewFactory({name: 'B'});
-       // Putting this in the very front.
-       viewContainerInsertAfter(commentViewContainer, bView, null);
-       // Now putting this in front of B (because it's in the very front).
-       viewContainerInsertAfter(commentViewContainer, embeddedViewFactory({name: 'A'}), null);
-       // Putting this one after B
-       viewContainerInsertAfter(commentViewContainer, embeddedViewFactory({name: 'C'}), bView);
+    const bView = embeddedViewFactory({name: 'B'});
+    // Putting this in the very front.
+    viewContainerInsertAfter(commentViewContainer, bView, null);
 
-       const divViewContainer = getViewContainer(fixture.hostElement.firstChild !) !;
-       viewContainerInsertAfter(divViewContainer, embeddedViewFactory({name: 'X'}), null);
+    // Now putting this in front of B (because it's in the very front).
+    viewContainerInsertAfter(commentViewContainer, embeddedViewFactory({name: 'A'}), null);
 
-       debugger;
-       fixture.update();
-       console.log(fixture.htmlWithContainerComments);
-       expect(log).toEqual(['X', 'A', 'B', 'C']);
-       expect(fixture.htmlWithContainerComments)
-           .toEqual('<div></div><!--container--><b>Hello </b><i>A</i><b>Hello </b><i>A</i>');
-     });
+    // Putting this one after B
+    viewContainerInsertAfter(commentViewContainer, embeddedViewFactory({name: 'C'}), bView);
+
+    // Putting this one right after that initial <div></div>
+    const divViewContainer = getViewContainer(fixture.hostElement.firstChild !) !;
+    viewContainerInsertAfter(divViewContainer, embeddedViewFactory({name: 'X'}), null);
+
+    fixture.update();
+    expect(fixture.htmlWithContainerComments)
+        .toEqual(
+            '<div></div><b>Hello </b><i>X</i><!--container--><b>Hello </b><i>A</i><b>Hello </b><i>B</i><b>Hello </b><i>C</i>');
+  });
 
   describe('getViewContainer', () => {
     it('should lazily create LContainers and add them to the internal linked list in the order of DOM',
