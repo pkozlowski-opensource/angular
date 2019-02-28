@@ -120,12 +120,13 @@ export function createTemplateRef<T>(
   if (declarationTNode.type === TNodeType.Container) {
     ngDevMode && assertDefined(declarationTNode.tViews, 'TView must be allocated');
     ngDevMode && assertNodeOfPossibleTypes(declarationTNode, TNodeType.Container);
-    const declarationContainer = unwrapLContainer(declarationLView[declarationTNode.index]);
-    const declarationQueries =
-        declarationContainer === null ? declarationContainer : declarationContainer[QUERIES];
+    // TODO: it is too early to take declaration queries here as we didn't create space for nodes
+    // created from a template instance declared here.
+    // Declaration queries should be resolved from the declarationTNode when an embedded view
+    // instance is created.
     return new R3TemplateRef(
         createElementRef(ElementRefToken, declarationTNode, declarationLView),
-        getEmbeddedViewFactoryInternal(declarationTNode, declarationLView, declarationQueries) !);
+        getEmbeddedViewFactoryInternal(declarationTNode, declarationLView) !);
   } else {
     return null;
   }

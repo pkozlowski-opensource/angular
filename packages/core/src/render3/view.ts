@@ -26,6 +26,7 @@ import {getLastRootElementFromView, getRNode, unwrapLContainer, unwrapRNode, vie
 /**
  *
  */
+// TODO: this seems to be used in tests only so should be moved to a test file?
 export function getEmbeddedViewFactory<T extends{}>(node: RNode): EmbeddedViewFactory<T>|null {
   ngDevMode && assertDomNode(node);
   const lContext = getLContext(node);
@@ -33,16 +34,13 @@ export function getEmbeddedViewFactory<T extends{}>(node: RNode): EmbeddedViewFa
     const declarationLView = lContext.lView;
     const declarationTView = declarationLView[TVIEW];
     const declarationTNode = declarationTView.data[lContext.nodeIndex] as TNode;
-    const declarationQueries = declarationLView[QUERIES];
-    return (getEmbeddedViewFactoryInternal<T>(
-        declarationTNode, declarationLView, declarationQueries) as any);
+    return (getEmbeddedViewFactoryInternal<T>(declarationTNode, declarationLView) as any);
   }
   return null;
 }
 
 export function getEmbeddedViewFactoryInternal<T extends{}>(
-    declarationTNode: TNode, declarationLView: LView,
-    declarationQueries: LQueries | null): EmbeddedViewFactoryInternal<T>|null {
+    declarationTNode: TNode, declarationLView: LView): EmbeddedViewFactoryInternal<T>|null {
   const templateTView = declarationTNode.tViews;
   if (templateTView) {
     if (Array.isArray(templateTView)) {
@@ -64,8 +62,18 @@ export function getEmbeddedViewFactoryInternal<T extends{}>(
             declarationLView, templateTView, context, LViewFlags.CheckAlways, host, hostTNode);
         lView[DECLARATION_VIEW] = declarationLView;
 
-        if (declarationQueries) {
-          lView[QUERIES] = declarationQueries.createView();
+        // TODO: should be always true and I would argue that declarationTNode type should be
+        // adjusted to be TContainerNode
+        if (declarationTNode.type === TNodeType.Container) {
+          const declarationContainer = unwrapLContainer(declarationLView[declarationTNode.index]) !;
+          // TODO: turn into a proper assert
+          if (!declarationContainer) {
+            throw 'We should always have declarationContainer for an embedded!';
+          }
+          const declarationQueries = declarationContainer[QUERIES];
+          if (declarationQueries) {
+            lView[QUERIES] = declarationQueries.createView();
+          }
         }
 
         assignTViewNodeToLView(templateTView, null, -1, lView);

@@ -2223,7 +2223,7 @@ export function createLContainer(
     isForViewContainerRef ? -1 : 0,  // active index
     currentView,                     // parent
     null,                            // next
-    currentView[QUERIES],            // queries | Grab current queries. (TODO: remove me)
+    null,                            // queries (TODO: remove me)
     [],                              // views
     native,                          // native
   ];
@@ -2287,6 +2287,12 @@ export function template(
   // instantiate the template. Using the Container as a storage mechanism for queries is wrong.
   // Container should not know about queries, since it is always the declaration query which matter
   // not the insertion.
+  // TODO(pk): agreed! What would be even better if template instruction would be creating a new
+  // type of node (TTemplateNode?) as what we are doing here is marking a _declaration_ point, not
+  // the insertion point. The insertion point _might_ (or might no) be created on the same node
+  // (if there is a directive asking for a ViewContainerRef) but creation of TContainerNode /
+  // LContainer should not be systematic (we might <ng-template> without any directive asking for
+  // VCRef on it).
 
   createDirectivesAndLocals(tView, lView, localRefs, localRefExtractor);
   addTContainerToQueries(lView, tContainerNode);
