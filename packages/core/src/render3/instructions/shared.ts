@@ -37,7 +37,7 @@ import {NO_CHANGE} from '../tokens';
 import {attrsStylingIndexOf} from '../util/attrs_utils';
 import {INTERPOLATION_DELIMITER, renderStringify} from '../util/misc_utils';
 import {getLViewParent, getRootContext} from '../util/view_traversal_utils';
-import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isRootView, readPatchedLView, resetPreOrderHookFlags, unwrapRNode, viewAttachedToChangeDetector} from '../util/view_utils';
+import {getComponentViewByIndex, getNativeByIndex, getNativeByTNode, getTNode, isComponent, isComponentDef, isContentQueryHost, isLContainer, isRootView, readPatchedLView, resetPreOrderHookFlags, unwrapRNode, viewAttachedToChangeDetector} from '../util/view_utils';
 
 
 
@@ -1425,12 +1425,11 @@ export function createLContainer(
 function refreshDynamicEmbeddedViews(lView: LView) {
   for (let current = lView[CHILD_HEAD]; current !== null; current = current[NEXT]) {
     // Note: current can be an LView or an LContainer instance, but here we are only interested
-    // in LContainer. We can tell it's an LContainer because its length is less than the LView
-    // header.
-    if (current.length < HEADER_OFFSET && current[ACTIVE_INDEX] === -1) {
-      const container = current as LContainer;
-      for (let i = 0; i < container[VIEWS].length; i++) {
-        const dynamicViewData = container[VIEWS][i];
+    // in LContainer.
+    if (isLContainer(current) && current[ACTIVE_INDEX] === -1) {
+      const views = (current as LContainer)[VIEWS];
+      for (let i = 0; i < views.length; i++) {
+        const dynamicViewData = views[i];
         // The directives and pipes are not needed here as an existing view is only being refreshed.
         ngDevMode && assertDefined(dynamicViewData[TVIEW], 'TView must be allocated');
         renderEmbeddedTemplate(dynamicViewData, dynamicViewData[TVIEW], dynamicViewData[CONTEXT] !);
