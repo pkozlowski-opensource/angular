@@ -10,11 +10,12 @@ import {assertHasParent} from '../assert';
 import {attachPatchData} from '../context_discovery';
 import {registerPostOrderHooks} from '../hooks';
 import {TAttributes, TNodeType} from '../interfaces/node';
-import {BINDING_INDEX, HEADER_OFFSET, QUERIES, RENDERER, TVIEW, T_HOST} from '../interfaces/view';
+import {BINDING_INDEX, HEADER_OFFSET, RENDERER, TVIEW, T_HOST} from '../interfaces/view';
 import {assertNodeType} from '../node_assert';
 import {appendChild} from '../node_manipulation';
 import {applyOnCreateInstructions} from '../node_util';
 import {getIsParent, getLView, getPreviousOrParentTNode, setIsNotParent, setPreviousOrParentTNode} from '../state';
+import {isContentQueryHost} from '../util/view_utils';
 
 import {createDirectivesAndLocals, executeContentQueries, getOrCreateTNode, setNodeStylingTemplate} from './shared';
 
@@ -60,13 +61,13 @@ export function ɵɵelementContainerStart(
 
   appendChild(native, tNode, lView);
   createDirectivesAndLocals(tView, lView, localRefs);
+
+  if (tView.firstTemplatePass && tView.tqueries !== null) {
+    tView.tqueries.elementStart(tView, tNode);
+  }
+
   attachPatchData(native, lView);
 
-  const currentQueries = lView[QUERIES];
-  if (currentQueries) {
-    currentQueries.addNode(tNode);
-    lView[QUERIES] = currentQueries.clone(tNode);
-  }
   executeContentQueries(tView, tNode, lView);
 }
 
@@ -88,17 +89,17 @@ export function ɵɵelementContainerEnd(): void {
   }
 
   ngDevMode && assertNodeType(previousOrParentTNode, TNodeType.ElementContainer);
-  const currentQueries = lView[QUERIES];
-  // Go back up to parent queries only if queries have been cloned on this element.
-  if (currentQueries && previousOrParentTNode.index === currentQueries.nodeIndex) {
-    lView[QUERIES] = currentQueries.parent;
-  }
 
   // this is required for all host-level styling-related instructions to run
   // in the correct order
   previousOrParentTNode.onElementCreationFns && applyOnCreateInstructions(previousOrParentTNode);
 
   registerPostOrderHooks(tView, previousOrParentTNode);
+
+  if (tView.firstTemplatePass && isContentQueryHost(previousOrParentTNode)) {
+    // TODO(pk): assert that tView.tqueries is not null
+    tView.tqueries !.elementEnd(previousOrParentTNode);
+  }
 }
 
 /**

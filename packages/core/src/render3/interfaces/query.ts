@@ -9,98 +9,58 @@
 import {Type} from '../../interface/type';
 import {QueryList} from '../../linker';
 
-import {TContainerNode, TElementContainerNode, TElementNode, TNode} from './node';
+import {TNode} from './node';
+import {TView} from './view';
 
-
-/** Used for tracking queries (e.g. ViewChild, ContentChild). */
-export interface LQueries {
-  /**
-   * The parent LQueries instance.
-   *
-   * When there is a content query, a new LQueries instance is created to avoid mutating any
-   * existing LQueries. After we are done searching content children, the parent property allows
-   * us to traverse back up to the original LQueries instance to continue to search for matches
-   * in the main view.
-   */
-  parent: LQueries|null;
-
-  /**
-   * The index of the node on which this LQueries instance was created / cloned in a given LView.
-   *
-   * This index is stored to minimize LQueries cloning: we can observe that LQueries can be mutated
-   * only under 2 conditions:
-   * - we are crossing an element that has directives with content queries (new queries are added);
-   * - we are descending into element hierarchy (creating a child element of an existing element)
-   * and the current LQueries object is tracking shallow queries (shallow queries are removed).
-   *
-   * Since LQueries are not cloned systematically we need to know exactly where (on each element)
-   * cloning occurred, so we can properly restore the set of tracked queries when going up the
-   * elements hierarchy.
-   *
-   * Always set to -1 for view queries as view queries are created before we process any node in a
-   * given view.
-   */
-  nodeIndex: number;
-
-  /**
-   * Ask queries to prepare a copy of itself. This ensures that:
-   * - tracking new queries on content nodes doesn't mutate list of queries tracked on a parent
-   * node;
-   * - we don't track shallow queries when descending into elements hierarchy.
-   *
-   * We will clone LQueries before constructing content queries
-   */
-  clone(tNode: TNode): LQueries;
-
-  /**
-   * Notify `LQueries` that a new `TNode` has been created and needs to be added to query results
-   * if matching query predicate.
-   */
-  addNode(tNode: TElementNode|TContainerNode|TElementContainerNode): void;
-
-  /**
-   * Notify `LQueries` that a new `TNode` has been created and needs to be added to query results
-   * if matching query predicate. This is a special mode invoked if the query container has to
-   * be created out of order (e.g. view created in the constructor of a directive).
-   */
-  insertNodeBeforeViews(tNode: TElementNode|TContainerNode|TElementContainerNode): void;
-
-  /**
-   * Notify `LQueries` that a new LContainer was added to ivy data structures. As a result we need
-   * to prepare room for views that might be inserted into this container.
-   */
-  container(): LQueries|null;
-
-  /**
-   * Notify `LQueries` that a new `LView` has been created. As a result we need to prepare room
-   * and collect nodes that match query predicate.
-   */
-  createView(): LQueries|null;
-
-  /**
-   * Notify `LQueries` that a new `LView` has been added to `LContainer`. As a result all
-   * the matching nodes from this view should be added to container's queries.
-   */
-  insertView(newViewIndex: number): void;
-
-  /**
-   * Notify `LQueries` that an `LView` has been removed from `LContainer`. As a result all
-   * the matching nodes from this view should be removed from container's queries.
-   */
-  removeView(): void;
-
-  /**
-   * Add additional `QueryList` to track.
-   *
-   * @param queryList `QueryList` to update with changes.
-   * @param predicate Either `Type` or selector array of [key, value] predicates.
-   * @param descend If true the query will recursively apply to the children.
-   * @param read Indicates which token should be read from DI for this query.
-   */
-  track<T>(
-      queryList: QueryList<T>, predicate: Type<any>|string[], descend?: boolean,
-      read?: Type<T>): void;
+export interface TQueryMetadata {
+  predicate: Type<any>|string[];
+  descendants: boolean;
+  read: any;
+  isStatic: boolean
 }
+
+export interface TQuery {
+  /**
+   * Query metadata extracted from query annotations.
+   */
+  metadata: TQueryMetadata;
+
+  parentQueryIndex: number;
+  /**
+   * Matches collected on the the first template pass. Each match is a pair of:
+   * - TNode index
+   * - match index (injectable index or -1 for the default read)
+   */
+  matches: number[]|null;
+
+  elementStart(tView: TView, tNode: TNode): void;
+  elementEnd(tNode: TNode): void;
+  template(tView: TView, tNode: TNode): TQuery|null;
+}
+
+export interface TQueries {
+  queries: TQuery[];
+  elementStart(tView: TView, tNode: TNode): void;
+  elementEnd(tNode: TNode): void;
+  template(tView: TView, tNode: TNode): TQueries|null;
+}
+
+export interface LQuery<T> {
+  matches: (T|T[])[]|null;
+  // TODO(pk): remove from the interface, introduce abstraction over storage (setDirty, first)
+  // instead
+  queryList: QueryList<T>;
+  first: T;
+}
+
+export interface LQueries {
+  queries: LQuery<any>[];
+  declarationContainer(embeddedViewTQueries: TQueries): LQueries|null;
+  createView(): LQueries;
+  insertView(tView: TView): void;
+  removeView(tView: TView): void;
+}
+
 
 // Note: This hack is necessary so we don't erroneously get a circular dependency
 // failure based on types.

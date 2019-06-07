@@ -218,9 +218,9 @@ export function insertView(lView: LView, lContainer: LContainer, index: number) 
 
   lView[PARENT] = lContainer;
 
-  // Notify query that a new view has been added
-  if (lView[QUERIES]) {
-    lView[QUERIES] !.insertView(index);
+  // notify query that a new view has been added
+  if (lView[QUERIES] !== null) {
+    lView[QUERIES] !.insertView(lView[TVIEW]);
   }
 
   // Sets the attached flag
@@ -246,13 +246,14 @@ export function detachView(lContainer: LContainer, removeIndex: number): LView|u
     if (removeIndex > 0) {
       lContainer[indexInContainer - 1][NEXT] = viewToDetach[NEXT] as LView;
     }
-    lContainer.splice(CONTAINER_HEADER_OFFSET + removeIndex, 1);
+    const removedLView = lContainer.splice(CONTAINER_HEADER_OFFSET + removeIndex, 1)[0];
     addRemoveViewFromContainer(viewToDetach, false);
 
-    if ((viewToDetach[FLAGS] & LViewFlags.Attached) &&
-        !(viewToDetach[FLAGS] & LViewFlags.Destroyed) && viewToDetach[QUERIES]) {
-      viewToDetach[QUERIES] !.removeView();
+    // notify query that a view has been removed
+    if (removedLView[QUERIES] !== null) {
+      removedLView[QUERIES] !.removeView(removedLView[TVIEW]);
     }
+
     viewToDetach[PARENT] = null;
     viewToDetach[NEXT] = null;
     // Unsets the attached flag
@@ -344,8 +345,8 @@ function cleanUpView(view: LView | LContainer): void {
       (view[RENDERER] as ProceduralRenderer3).destroy();
     }
     // For embedded views still attached to a container: remove query result from this view.
-    if (viewAttachedToContainer(view) && view[QUERIES]) {
-      view[QUERIES] !.removeView();
+    if (viewAttachedToContainer(view) && view[QUERIES] !== null) {
+      view[QUERIES] !.removeView(view[TVIEW]);
     }
   }
 }

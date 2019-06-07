@@ -9,7 +9,6 @@
 import {InjectionToken} from '../../di/injection_token';
 import {Injector} from '../../di/injector';
 import {Type} from '../../interface/type';
-import {QueryList} from '../../linker';
 import {SchemaMetadata} from '../../metadata';
 import {Sanitizer} from '../../sanitization/security';
 
@@ -18,7 +17,7 @@ import {ComponentDef, ComponentTemplate, DirectiveDef, DirectiveDefList, HostBin
 import {I18nUpdateOpCodes, TI18n} from './i18n';
 import {TElementNode, TNode, TViewNode} from './node';
 import {PlayerHandler} from './player';
-import {LQueries} from './query';
+import {LQueries, TQueries} from './query';
 import {RElement, Renderer3, RendererFactory3} from './renderer';
 import {StylingContext} from './styling';
 
@@ -43,9 +42,8 @@ export const RENDERER = 12;
 export const SANITIZER = 13;
 export const CHILD_HEAD = 14;
 export const CHILD_TAIL = 15;
-export const CONTENT_QUERIES = 16;
-export const DECLARATION_VIEW = 17;
-export const PREORDER_HOOK_FLAGS = 18;
+export const DECLARATION_VIEW = 16;
+export const PREORDER_HOOK_FLAGS = 17;
 /** Size of LView's header. Necessary to adjust for it when setting slots.  */
 export const HEADER_OFFSET = 20;
 
@@ -183,13 +181,6 @@ export interface LView extends Array<any> {
    * without having to propagate starting from the first child.
    */
   [CHILD_TAIL]: LView|LContainer|null;
-
-  /**
-   * Stores QueryLists associated with content queries of a directive. This data structure is
-   * filled-in as part of a directive creation process and is later used to retrieve a QueryList to
-   * be refreshed.
-   */
-  [CONTENT_QUERIES]: QueryList<any>[]|null;
 
   /**
    * View where this view's template was declared.
@@ -330,6 +321,8 @@ export interface ExpandoInstructions extends Array<number|HostBindingsFunction<a
  * Stored on the `ComponentDef.tView`.
  */
 export interface TView {
+  tqueries: TQueries|null;
+
   /**
    * ID for inline views to determine whether a view is the same as the previous view
    * in a certain position. If it's not, we know the new view needs to be inserted
@@ -424,6 +417,8 @@ export interface TView {
    * increment query index after each iteration. This information helps us to reset index back to
    * the beginning of view query list before we invoke view queries again.
    */
+  // TODO(pk): rename to view query count or content query start - it has different meaning and use
+  // now
   viewQueryStartIndex: number;
 
   /**

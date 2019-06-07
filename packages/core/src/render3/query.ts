@@ -13,6 +13,7 @@ import {Type} from '../interface/type';
 import {ElementRef as ViewEngine_ElementRef} from '../linker/element_ref';
 import {QueryList} from '../linker/query_list';
 import {TemplateRef as ViewEngine_TemplateRef} from '../linker/template_ref';
+import {ViewContainerRef} from '../linker/view_container_ref';
 import {assertDataInRange, assertDefined, assertEqual} from '../util/assert';
 
 import {assertPreviousIsParent} from './assert';
@@ -20,187 +21,197 @@ import {getNodeInjectable, locateDirectiveOrProvider} from './di';
 import {NG_ELEMENT_ID} from './fields';
 import {store} from './instructions/all';
 import {storeCleanupWithContext} from './instructions/shared';
+import {CONTAINER_HEADER_OFFSET, LContainer} from './interfaces/container';
 import {unusedValueExportToPlacateAjd as unused1} from './interfaces/definition';
 import {unusedValueExportToPlacateAjd as unused2} from './interfaces/injector';
 import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType, unusedValueExportToPlacateAjd as unused3} from './interfaces/node';
-import {LQueries, unusedValueExportToPlacateAjd as unused4} from './interfaces/query';
-import {CONTENT_QUERIES, HEADER_OFFSET, LView, QUERIES, TVIEW, TView} from './interfaces/view';
+import {LQueries, LQuery, TQueries, TQuery, TQueryMetadata, unusedValueExportToPlacateAjd as unused4} from './interfaces/query';
+import {HEADER_OFFSET, LView, QUERIES, TVIEW, TView} from './interfaces/view';
 import {getCurrentQueryIndex, getIsParent, getLView, getPreviousOrParentTNode, isCreationMode, setCurrentQueryIndex} from './state';
-import {isContentQueryHost, loadInternal} from './util/view_utils';
-import {createElementRef, createTemplateRef} from './view_engine_compatibility';
+import {createContainerRef, createElementRef, createTemplateRef} from './view_engine_compatibility';
 
 const unusedValueToPlacateAjd = unused1 + unused2 + unused3 + unused4;
 
-/**
- * A predicate which determines if a given element/directive should be included in the query
- * results.
- */
-export interface QueryPredicate<T> {
-  /**
-   * If looking for directives then it contains the directive type.
-   */
-  type: Type<T>|null;
-
-  /**
-   * If selector then contains local names to query for.
-   */
-  selector: string[]|null;
-
-  /**
-   * Indicates which token should be read from DI for this query.
-   */
-  read: Type<T>|null;
+class LQuery2_<T> implements LQuery<T> {
+  matches: T[]|null = null;
+  // PERF(pk): we shouldn't need queryList here, it boils down to instructions setup
+  constructor(public queryList: QueryList<T>) {}
+  get first(): T { return this.queryList.first; }
 }
 
-/**
- * An object representing a query, which is a combination of:
- * - query predicate to determines if a given element/directive should be included in the query
- * - values collected based on a predicate
- * - `QueryList` to which collected values should be reported
- */
-class LQuery<T> {
-  constructor(
-      /**
-       * Next query. Used when queries are stored as a linked list in `LQueries`.
-       */
-      public next: LQuery<any>|null,
+class LQueries2_ implements LQueries {
+  constructor(public queries: LQuery<any>[] = []) {}
 
-      /**
-       * Destination to which the value should be added.
-       */
-      public list: QueryList<T>,
+  declarationContainer(embeddedViewTQueries: TQueries): LQueries|null {
+    const containerLQueries: LQuery<any>[] = [];
 
-      /**
-       * A predicate which determines if a given element/directive should be included in the query
-       * results.
-       */
-      public predicate: QueryPredicate<T>,
+    for (let tQuery of embeddedViewTQueries.queries) {
+      const parentLQuery = this.queries ![tQuery.parentQueryIndex];
+      const lQueryClone = new LQuery2_(parentLQuery.queryList);
+      containerLQueries.push(lQueryClone);
+    }
 
-      /**
-       * Values which have been located.
-       * This is what builds up the `QueryList._valuesTree`.
-       */
-      public values: any[],
+    return new LQueries2_(containerLQueries);
+  }
 
-      /**
-       * A pointer to an array that stores collected values from views. This is necessary so we
-       * know a container into which to insert nodes collected from views.
-       */
-      public containerValues: any[]|null) {}
+  createView(): LQueries {
+    const viewLQueries: LQuery<any>[] = [];
+    for (let lQuery of this.queries) {
+      viewLQueries.push(new LQuery2_(lQuery.queryList));
+    }
+    return new LQueries2_(viewLQueries);
+  }
+
+  insertView(tView: TView): void { this.dirtyQueriesWithMatches(tView); }
+
+  removeView(tView: TView): void { this.dirtyQueriesWithMatches(tView); }
+
+  private dirtyQueriesWithMatches(tView: TView) {
+    for (let i = 0; i < this.queries.length; i++) {
+      const lQuery = this.queries[i];
+      // TODO(pk): assert (or better yet, create a getter)
+      const tQuery = tView.tqueries !.queries[i];
+      // TODO(pk): firstTemplatePass check is here since the view insertion happens before a
+      // template is processed
+      // I think that this is another bug that I should fix via
+      // https://github.com/angular/angular/pull/31312 - remove this check when the mentioned PR
+      // lands
+      if (tView.firstTemplatePass || tQuery.matches !== null) {
+        lQuery.queryList.setDirty();
+      }
+    }
+  }
 }
 
-export class LQueries_ implements LQueries {
-  constructor(
-      public parent: LQueries_|null, private shallow: LQuery<any>|null,
-      private deep: LQuery<any>|null, public nodeIndex: number = -1) {}
+function getSelectorMatchingIdx(tNode: TNode, selector: string[]): number|null {
+  for (let i = 0; i < selector.length; i++) {
+    const matchingIdx = getIdxOfMatchingSelector(tNode, selector[i]);
+    if (matchingIdx !== null) {
+      return matchingIdx;
+    }
+  }
+  return null;
+}
 
-  track<T>(queryList: QueryList<T>, predicate: Type<T>|string[], descend?: boolean, read?: Type<T>):
-      void {
-    if (descend) {
-      this.deep = createLQuery(this.deep, queryList, predicate, read != null ? read : null);
+class TQueryMetadata_ implements TQueryMetadata {
+  constructor(
+      public predicate: Type<any>|string[], public descendants: boolean, public read: any,
+      public isStatic: boolean) {}
+}
+
+class TQueries_ implements TQueries {
+  constructor(public queries: TQuery[] = []) {}
+
+  elementStart(tView: TView, tNode: TNode): void {
+    for (let query of this.queries) {
+      query.elementStart(tView, tNode);
+    }
+  }
+  elementEnd(tNode: TNode): void {
+    for (let query of this.queries) {
+      query.elementEnd(tNode);
+    }
+  }
+  template(tView: TView, tNode: TNode): TQueries|null {
+    const queriesForTemplateRef: TQuery[] = [];
+
+    for (let i = 0; i < this.queries.length; i++) {
+      const tquery = this.queries[i];
+      const tqueryClone = tquery.template(tView, tNode);
+      if (tqueryClone) {
+        tqueryClone.parentQueryIndex = i;
+        queriesForTemplateRef.push(tqueryClone);
+      }
+    }
+
+    return queriesForTemplateRef.length ? new TQueries_(queriesForTemplateRef) : null;
+  }
+}
+
+class TQuery_ implements TQuery {
+  parentQueryIndex = -1;
+  matches: any[]|null = null;
+
+  /**
+   * A node index on which a query was declared (-1 for view queries and ones inherited from the
+   * declaration template). We use this index (alongside with _appliesToNextNode flag) to know
+   * when
+   * to apply content queries to elements in a template.
+   */
+  private _declarationNodeIndex: number;
+
+  /**
+   * A flag indicating if a given still applies to nodes it is crossing. We use this flag
+   * (alongside
+   * with _declarationNodeIndex) to know when to stop applying content queries to elements in a
+   * template.
+   */
+  private _appliesToNextNode = true;
+
+  constructor(public metadata: TQueryMetadata, nodeIndex: number = -1) {
+    this._declarationNodeIndex = nodeIndex;
+  }
+
+  elementStart(tView: TView, tNode: TNode): void {
+    if (this.isApplyingToNode(tNode)) {
+      this.addMatch(tNode.index, this.getMatchIndex(tView, tNode));
+    }
+  }
+
+  elementEnd(tNode: TNode): void {
+    if (this._declarationNodeIndex === tNode.index) {
+      this._appliesToNextNode = false;
+    }
+  }
+
+  template(tView: TView, tNode: TNode): TQuery|null {
+    if (this.isApplyingToNode(tNode)) {
+      // add a template node if it matches
+      this.addMatch(tNode.index, this.getMatchIndex(tView, tNode));
+      // add a TemplateRef marker
+      this.addMatch(-tNode.index, -1);
+      return new TQuery_(this.metadata);
+    }
+    return null;
+  }
+
+  private isApplyingToNode(tNode: TNode): boolean {
+    if (this._appliesToNextNode && this.metadata.descendants === false) {
+      return this._declarationNodeIndex === (tNode.parent ? tNode.parent.index : -1);
+    }
+    return this._appliesToNextNode;
+  }
+
+  private getMatchIndex(tView: TView, tNode: TNode): number|null {
+    let matchIdx: number|null = null;
+    if (Array.isArray(this.metadata.predicate)) {
+      matchIdx = getSelectorMatchingIdx(tNode, this.metadata.predicate as string[]);
     } else {
-      this.shallow = createLQuery(this.shallow, queryList, predicate, read != null ? read : null);
+      const typePredicate = this.metadata.predicate as any;
+      if (typePredicate === ViewEngine_TemplateRef) {
+        matchIdx = tNode.type === TNodeType.Container ? -1 : null;
+      } else {
+        matchIdx = locateDirectiveOrProvider(tNode, tView, typePredicate, false, false)
+      }
+    }
+    const read = this.metadata.read;
+    if (matchIdx !== null && read != null) {
+      if (read === ViewEngine_ElementRef || read === ViewContainerRef ||
+          read === ViewEngine_TemplateRef && tNode.type === TNodeType.Container) {
+        matchIdx = -2;
+      } else {
+        matchIdx = locateDirectiveOrProvider(tNode, tView, this.metadata.read, false, false);
+      }
+    }
+    return matchIdx;
+  }
+
+  private addMatch(tNodeIdx: number, matchIdx: number|null) {
+    if (matchIdx !== null) {
+      if (this.matches === null) this.matches = [];
+      this.matches.push(tNodeIdx, matchIdx);
     }
   }
-
-  clone(tNode: TNode): LQueries {
-    return this.shallow !== null || isContentQueryHost(tNode) ?
-        new LQueries_(this, null, this.deep, tNode.index) :
-        this;
-  }
-
-  container(): LQueries|null {
-    const shallowResults = copyQueriesToContainer(this.shallow);
-    const deepResults = copyQueriesToContainer(this.deep);
-    return shallowResults || deepResults ? new LQueries_(this, shallowResults, deepResults) : null;
-  }
-
-  createView(): LQueries|null {
-    const shallowResults = copyQueriesToView(this.shallow);
-    const deepResults = copyQueriesToView(this.deep);
-
-    return shallowResults || deepResults ? new LQueries_(this, shallowResults, deepResults) : null;
-  }
-
-  insertView(index: number): void {
-    insertView(index, this.shallow);
-    insertView(index, this.deep);
-  }
-
-  addNode(tNode: TElementNode|TContainerNode|TElementContainerNode): void {
-    add(this.deep, tNode, false);
-    add(this.shallow, tNode, false);
-  }
-
-  insertNodeBeforeViews(tNode: TElementNode|TContainerNode|TElementContainerNode): void {
-    add(this.deep, tNode, true);
-    add(this.shallow, tNode, true);
-  }
-
-  removeView(): void {
-    removeView(this.shallow);
-    removeView(this.deep);
-  }
-}
-
-function copyQueriesToContainer(query: LQuery<any>| null): LQuery<any>|null {
-  let result: LQuery<any>|null = null;
-
-  while (query) {
-    const containerValues: any[] = [];  // prepare room for views
-    query.values.push(containerValues);
-    result = new LQuery<any>(result, query.list, query.predicate, containerValues, null);
-    query = query.next;
-  }
-
-  return result;
-}
-
-function copyQueriesToView(query: LQuery<any>| null): LQuery<any>|null {
-  let result: LQuery<any>|null = null;
-
-  while (query) {
-    result = new LQuery<any>(result, query.list, query.predicate, [], query.values);
-    query = query.next;
-  }
-
-  return result;
-}
-
-function insertView(index: number, query: LQuery<any>| null) {
-  while (query) {
-    ngDevMode && assertViewQueryhasPointerToDeclarationContainer(query);
-    query.containerValues !.splice(index, 0, query.values);
-
-    // mark a query as dirty only when inserted view had matching modes
-    if (query.values.length) {
-      query.list.setDirty();
-    }
-
-    query = query.next;
-  }
-}
-
-function removeView(query: LQuery<any>| null) {
-  while (query) {
-    ngDevMode && assertViewQueryhasPointerToDeclarationContainer(query);
-
-    const containerValues = query.containerValues !;
-    const viewValuesIdx = containerValues.indexOf(query.values);
-    const removed = containerValues.splice(viewValuesIdx, 1);
-
-    // mark a query as dirty only when removed view had matching modes
-    ngDevMode && assertEqual(removed.length, 1, 'removed.length');
-    if (removed[0].length) {
-      query.list.setDirty();
-    }
-
-    query = query.next;
-  }
-}
-
-function assertViewQueryhasPointerToDeclarationContainer(query: LQuery<any>) {
-  assertDefined(query.containerValues, 'View queries need to have a pointer to container values.');
 }
 
 /**
@@ -224,148 +235,92 @@ function getIdxOfMatchingSelector(tNode: TNode, selector: string): number|null {
 }
 
 
-// TODO: "read" should be an AbstractType (FW-486)
-function queryByReadToken(read: any, tNode: TNode, currentView: LView): any {
-  const factoryFn = (read as any)[NG_ELEMENT_ID];
-  if (typeof factoryFn === 'function') {
-    return factoryFn();
-  } else {
-    const tView = currentView[TVIEW];
-    const matchingIdx = locateDirectiveOrProvider(tNode, tView, read as Type<any>, false, false);
-    if (matchingIdx !== null) {
-      return getNodeInjectable(tView.data, currentView, matchingIdx, tNode as TElementNode);
-    }
-  }
-  return null;
-}
-
 function queryByTNodeType(tNode: TNode, currentView: LView): any {
   if (tNode.type === TNodeType.Element || tNode.type === TNodeType.ElementContainer) {
     return createElementRef(ViewEngine_ElementRef, tNode, currentView);
-  }
-  if (tNode.type === TNodeType.Container) {
+  } else if (tNode.type === TNodeType.Container) {
     return createTemplateRef(ViewEngine_TemplateRef, ViewEngine_ElementRef, tNode, currentView);
   }
   return null;
 }
 
-function queryByTemplateRef(
-    templateRefToken: ViewEngine_TemplateRef<any>, tNode: TNode, currentView: LView,
-    read: any): any {
-  const templateRefResult = (templateRefToken as any)[NG_ELEMENT_ID]();
-  if (read) {
-    return templateRefResult ? queryByReadToken(read, tNode, currentView) : null;
-  }
-  return templateRefResult;
-}
 
-function queryRead(tNode: TNode, currentView: LView, read: any, matchingIdx: number): any {
-  if (read) {
-    return queryByReadToken(read, tNode, currentView);
-  }
-  if (matchingIdx > -1) {
-    return getNodeInjectable(
-        currentView[TVIEW].data, currentView, matchingIdx, tNode as TElementNode);
-  }
-  // if read token and / or strategy is not specified,
-  // detect it using appropriate tNode type
-  return queryByTNodeType(tNode, currentView);
-}
-
-/**
- * Add query matches for a given node.
- *
- * @param query The first query in the linked list
- * @param tNode The TNode to match against queries
- * @param insertBeforeContainer Whether or not we should add matches before the last
- * container array. This mode is necessary if the query container had to be created
- * out of order (e.g. a view was created in a constructor)
- */
-function add(
-    query: LQuery<any>| null, tNode: TElementNode | TContainerNode | TElementContainerNode,
-    insertBeforeContainer: boolean) {
-  const lView = getLView();
-  const tView = lView[TVIEW];
-
-  while (query) {
-    const predicate = query.predicate;
-    const type = predicate.type as any;
-    if (type) {
-      let result = null;
-      if (type === ViewEngine_TemplateRef) {
-        result = queryByTemplateRef(type, tNode, lView, predicate.read);
-      } else {
-        const matchingIdx = locateDirectiveOrProvider(tNode, tView, type, false, false);
-        if (matchingIdx !== null) {
-          result = queryRead(tNode, lView, predicate.read, matchingIdx);
-        }
-      }
-      if (result !== null) {
-        addMatch(query, result, insertBeforeContainer);
-      }
+function materializeNodeResult(lView: LView, tNode: TNode, matchingIdx: number, read: any): any {
+  if (matchingIdx === -1) {
+    // if read token and / or strategy is not specified, detect it using appropriate tNode type
+    return queryByTNodeType(tNode, lView);
+  } else if (matchingIdx === -2) {
+    if (read === ViewEngine_ElementRef) {
+      return createElementRef(ViewEngine_ElementRef, tNode, lView);
+    } else if (read === ViewEngine_TemplateRef) {
+      return createTemplateRef(ViewEngine_TemplateRef, ViewEngine_ElementRef, tNode, lView);
+    } else if (read === ViewContainerRef) {
+      // TODO(pk): assert on potential node type
+      return createContainerRef(
+          ViewContainerRef, ViewEngine_ElementRef,
+          tNode as TElementNode | TContainerNode | TElementContainerNode, lView);
     } else {
-      const selector = predicate.selector !;
-      for (let i = 0; i < selector.length; i++) {
-        const matchingIdx = getIdxOfMatchingSelector(tNode, selector[i]);
-        if (matchingIdx !== null) {
-          const result = queryRead(tNode, lView, predicate.read, matchingIdx);
-          if (result !== null) {
-            addMatch(query, result, insertBeforeContainer);
-          }
+      // TODO(pk): assert on special token type or throw here (dev mode only)
+    }
+  } else {
+    // assert matchingIdx > -1 (dev mode only) - or assert not 0 earlier on
+    return getNodeInjectable(lView[TVIEW].data, lView, matchingIdx, tNode as TElementNode);
+  }
+}
+
+function materializeViewResults(lView: LView, tQuery: TQuery, lQuery: LQuery<any>): any[] {
+  const tView = lView[TVIEW];
+  const tQueryMatches = tQuery.matches;
+
+  if (lQuery.matches === null) {
+    const result: any[] = [];
+    if (tQueryMatches !== null) {
+      for (let i = 0; i < tQueryMatches.length; i += 2) {
+        const matchedNodeIdx = tQueryMatches[i];
+        if (matchedNodeIdx < 0) {
+          result.push(null);
+        } else {
+          // TODO(pk): assert on index and TNode
+          const tNode = tView.data[matchedNodeIdx] as TNode;
+          result.push(
+              materializeNodeResult(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read));
         }
       }
     }
-    query = query.next;
+    lQuery.matches = result;
   }
+
+  return lQuery.matches;
 }
 
-function addMatch(query: LQuery<any>, matchingValue: any, insertBeforeViewMatches: boolean): void {
-  // Views created in constructors may have their container values created too early. In this case,
-  // ensure template node results are unshifted before container results. Otherwise, results inside
-  // embedded views will appear before results on parent template nodes when flattened.
-  insertBeforeViewMatches ? query.values.unshift(matchingValue) : query.values.push(matchingValue);
-  query.list.setDirty();
-}
+export function buildQueryResults<T>(
+    lView: LView, queryIndex: number, result: T[] = []): (T | T[])[] {
+  const tView = lView[TVIEW];
+  // TODO(pk): assert that tqueries is not null
+  const tQuery = tView.tqueries !.queries[queryIndex];
+  const lQuery = lView[QUERIES] !.queries ![queryIndex];
 
-function createPredicate<T>(predicate: Type<T>| string[], read: Type<T>| null): QueryPredicate<T> {
-  const isArray = Array.isArray(predicate);
-  return {
-    type: isArray ? null : predicate as Type<T>,
-    selector: isArray ? predicate as string[] : null,
-    read: read
-  };
-}
+  const lViewResults = materializeViewResults(lView, tQuery, lQuery);
+  // TODO(pk): optimise where we can simply return view matches (if there are no containers)
 
-function createLQuery<T>(
-    previous: LQuery<any>| null, queryList: QueryList<T>, predicate: Type<T>| string[],
-    read: Type<T>| null): LQuery<T> {
-  return new LQuery(
-      previous, queryList, createPredicate(predicate, read),
-      (queryList as any as QueryList_<T>)._valuesTree, null);
-}
+  if (tQuery.matches !== null) {
+    for (let i = 0; i < tQuery.matches.length; i += 2) {
+      const tNodeIdx = tQuery.matches[i];
+      if (tNodeIdx > 0) {
+        result.push(lViewResults[i / 2]);
+      } else {
+        // TODO(pk): assert on index and type
+        const declarationLContainer = lView[-tNodeIdx] as LContainer;
+        // TODO(pk): for now assume that the declaration and insertion point is the same
+        for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
+          const embeddedLView = declarationLContainer[j];
+          buildQueryResults(embeddedLView, queryIndex, result);
+        }
+      }
+    }
+  }
 
-type QueryList_<T> = QueryList<T>& {_valuesTree: any[], _static: boolean};
-
-/**
- * Creates a QueryList and stores it in LView's collection of active queries (LQueries).
- *
- * @param predicate The type for which the query will search
- * @param descend Whether or not to descend into children
- * @param read What to save in the query
- * @returns QueryList<T>
- */
-function createQueryListInLView<T>(
-    // TODO: "read" should be an AbstractType (FW-486)
-    lView: LView, predicate: Type<any>| string[], descend: boolean, read: any, isStatic: boolean,
-    nodeIndex: number): QueryList<T> {
-  ngDevMode && assertPreviousIsParent(getIsParent());
-  const queryList = new QueryList<T>() as QueryList_<T>;
-  const queries = lView[QUERIES] || (lView[QUERIES] = new LQueries_(null, null, null, nodeIndex));
-  queryList._valuesTree = [];
-  queryList._static = isStatic;
-  queries.track(queryList, predicate, descend, read);
-  storeCleanupWithContext(lView, queryList, queryList.destroy);
-  return queryList;
+  return result;
 }
 
 /**
@@ -378,15 +333,22 @@ function createQueryListInLView<T>(
  * @codeGenApi
  */
 export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
-  const queryListImpl = (queryList as any as QueryList_<any>);
-  const creationMode = isCreationMode();
+  const lView = getLView();
+  const tView = lView[TVIEW];
+  const queryIndex = getCurrentQueryIndex();
 
-  // if creation mode and static or update mode and not static
-  if (queryList.dirty && creationMode === queryListImpl._static) {
-    queryList.reset(queryListImpl._valuesTree || []);
+  setCurrentQueryIndex(queryIndex + 1);
+
+  // TODO(pk): I definitivelly need a getter or sth else here
+  const tQuery = tView.tqueries !.queries[queryIndex];
+
+  if (queryList.dirty && (isCreationMode() === tQuery.metadata.isStatic)) {
+    // PERF(pk): we are building a flattened version of the matches so no need to flatten it again
+    queryList.reset(buildQueryResults(lView, queryIndex));
     queryList.notifyOnChanges();
     return true;
   }
+
   return false;
 }
 
@@ -400,12 +362,8 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
  * @codeGenApi
  */
 export function ɵɵstaticViewQuery<T>(
-    // TODO(FW-486): "read" should be an AbstractType
     predicate: Type<any>| string[], descend: boolean, read: any): void {
-  const lView = getLView();
-  const tView = lView[TVIEW];
-  viewQueryInternal(lView, tView, predicate, descend, read, true);
-  tView.staticViewQueries = true;
+  viewQueryInternal(getLView(), new TQueryMetadata_(predicate, descend, read, true));
 }
 
 /**
@@ -414,41 +372,31 @@ export function ɵɵstaticViewQuery<T>(
  * @param predicate The type for which the query will search
  * @param descend Whether or not to descend into children
  * @param read What to save in the query
- * @returns QueryList<T>
  *
  * @codeGenApi
  */
-export function ɵɵviewQuery<T>(
-    // TODO(FW-486): "read" should be an AbstractType
-    predicate: Type<any>| string[], descend: boolean, read: any): QueryList<T> {
-  const lView = getLView();
-  const tView = lView[TVIEW];
-  return viewQueryInternal(lView, tView, predicate, descend, read, false);
+export function ɵɵviewQuery<T>(predicate: Type<any>| string[], descend: boolean, read: any): void {
+  viewQueryInternal(getLView(), new TQueryMetadata_(predicate, descend, read, false));
 }
 
-function viewQueryInternal<T>(
-    lView: LView, tView: TView, predicate: Type<any>| string[], descend: boolean, read: any,
-    isStatic: boolean): QueryList<T> {
+function viewQueryInternal<T>(lView: LView, queryMetadata: TQueryMetadata): void {
+  const tView = lView[TVIEW];
   if (tView.firstTemplatePass) {
-    tView.expandoStartIndex++;
+    createTQuery(tView, queryMetadata, -1);
+    if (queryMetadata.isStatic) {
+      tView.staticViewQueries = true;
+    }
   }
-  const index = getCurrentQueryIndex();
-  const queryList: QueryList<T> =
-      createQueryListInLView<T>(lView, predicate, descend, read, isStatic, -1);
-  store(index - HEADER_OFFSET, queryList);
-  setCurrentQueryIndex(index + 1);
-  return queryList;
+  createLQuery<T>(lView);
 }
 
 /**
- * Loads current View Query and moves the pointer/index to the next View Query in LView.
+ * Loads a QueryList corresponding to the current view query.
  *
  * @codeGenApi
  */
-export function ɵɵloadViewQuery<T>(): T {
-  const index = getCurrentQueryIndex();
-  setCurrentQueryIndex(index + 1);
-  return loadInternal<T>(getLView(), index - HEADER_OFFSET);
+export function ɵɵloadViewQuery<T>(): QueryList<T> {
+  return loadQueryInternal<T>(getLView(), getCurrentQueryIndex());
 }
 
 /**
@@ -464,33 +412,10 @@ export function ɵɵloadViewQuery<T>(): T {
  * @codeGenApi
  */
 export function ɵɵcontentQuery<T>(
-    directiveIndex: number, predicate: Type<any>| string[], descend: boolean,
-    // TODO(FW-486): "read" should be an AbstractType
-    read: any): QueryList<T> {
-  const lView = getLView();
-  const tView = lView[TVIEW];
-  const tNode = getPreviousOrParentTNode();
-  return contentQueryInternal(
-      lView, tView, directiveIndex, predicate, descend, read, false, tNode.index);
-}
-
-function contentQueryInternal<T>(
-    lView: LView, tView: TView, directiveIndex: number, predicate: Type<any>| string[],
-    descend: boolean,
-    // TODO(FW-486): "read" should be an AbstractType
-    read: any, isStatic: boolean, nodeIndex: number): QueryList<T> {
-  const contentQuery: QueryList<T> =
-      createQueryListInLView<T>(lView, predicate, descend, read, isStatic, nodeIndex);
-  (lView[CONTENT_QUERIES] || (lView[CONTENT_QUERIES] = [])).push(contentQuery);
-  if (tView.firstTemplatePass) {
-    const tViewContentQueries = tView.contentQueries || (tView.contentQueries = []);
-    const lastSavedDirectiveIndex =
-        tView.contentQueries.length ? tView.contentQueries[tView.contentQueries.length - 1] : -1;
-    if (directiveIndex !== lastSavedDirectiveIndex) {
-      tViewContentQueries.push(directiveIndex);
-    }
-  }
-  return contentQuery;
+    directiveIndex: number, predicate: Type<any>| string[], descend: boolean, read: any): void {
+  contentQueryInternal(
+      getLView(), new TQueryMetadata_(predicate, descend, read, false), getPreviousOrParentTNode(),
+      directiveIndex);
 }
 
 /**
@@ -506,29 +431,55 @@ function contentQueryInternal<T>(
  * @codeGenApi
  */
 export function ɵɵstaticContentQuery<T>(
-    directiveIndex: number, predicate: Type<any>| string[], descend: boolean,
-    // TODO(FW-486): "read" should be an AbstractType
-    read: any): void {
-  const lView = getLView();
+    directiveIndex: number, predicate: Type<any>| string[], descend: boolean, read: any): void {
+  contentQueryInternal(
+      getLView(), new TQueryMetadata_(predicate, descend, read, true), getPreviousOrParentTNode(),
+      directiveIndex);
+}
+
+function contentQueryInternal<T>(
+    lView: LView, queryMetadata: TQueryMetadata, tNode: TNode, directiveIndex: number): void {
   const tView = lView[TVIEW];
-  const tNode = getPreviousOrParentTNode();
-  contentQueryInternal(lView, tView, directiveIndex, predicate, descend, read, true, tNode.index);
-  tView.staticContentQueries = true;
+  if (tView.firstTemplatePass) {
+    createTQuery(tView, queryMetadata, tNode.index);
+    saveContentQueryAndDirectiveIndex(tView, directiveIndex);
+    if (queryMetadata.isStatic) {
+      tView.staticContentQueries = true;
+    }
+  }
+
+  createLQuery<T>(lView);
 }
 
 /**
+ * Loads a QueryList corresponding to the current content query.
  *
  * @codeGenApi
  */
 export function ɵɵloadContentQuery<T>(): QueryList<T> {
-  const lView = getLView();
-  ngDevMode &&
-      assertDefined(
-          lView[CONTENT_QUERIES], 'Content QueryList array should be defined if reading a query.');
+  return loadQueryInternal<T>(getLView(), getCurrentQueryIndex());
+}
 
-  const index = getCurrentQueryIndex();
-  ngDevMode && assertDataInRange(lView[CONTENT_QUERIES] !, index);
+function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
+  // TODO(pk): asserts (presence of queries, index)
+  return lView[QUERIES] !.queries[queryIndex].queryList;
+}
 
-  setCurrentQueryIndex(index + 1);
-  return lView[CONTENT_QUERIES] ![index];
+function createLQuery<T>(lView: LView) {
+  if (lView[QUERIES] === null) lView[QUERIES] = new LQueries2_();
+  lView[QUERIES] !.queries.push(new LQuery2_(new QueryList<T>()));
+}
+
+function createTQuery(tView: TView, metadata: TQueryMetadata, nodeIndex: number): void {
+  if (tView.tqueries === null) tView.tqueries = new TQueries_();
+  tView.tqueries.queries.push(new TQuery_(metadata, nodeIndex));
+}
+
+function saveContentQueryAndDirectiveIndex(tView: TView, directiveIndex: number) {
+  const tViewContentQueries = tView.contentQueries || (tView.contentQueries = []);
+  const lastSavedDirectiveIndex =
+      tView.contentQueries.length ? tViewContentQueries[tViewContentQueries.length - 1] : -1;
+  if (directiveIndex !== lastSavedDirectiveIndex) {
+    tViewContentQueries.push(tView.tqueries !.queries.length - 1, directiveIndex);
+  }
 }

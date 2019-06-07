@@ -14,10 +14,10 @@ import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer, NATIVE} from '../inte
 import {DirectiveDefList, PipeDefList, ViewQueriesFunction} from '../interfaces/definition';
 import {COMMENT_MARKER, ELEMENT_MARKER, I18nMutateOpCode, I18nMutateOpCodes, I18nUpdateOpCode, I18nUpdateOpCodes, TIcu} from '../interfaces/i18n';
 import {TElementNode, TNode, TViewNode} from '../interfaces/node';
-import {LQueries} from '../interfaces/query';
+import {LQueries, TQueries} from '../interfaces/query';
 import {RComment, RElement} from '../interfaces/renderer';
 import {StylingContext} from '../interfaces/styling';
-import {BINDING_INDEX, CHILD_HEAD, CHILD_TAIL, CLEANUP, CONTENT_QUERIES, CONTEXT, DECLARATION_VIEW, ExpandoInstructions, FLAGS, HEADER_OFFSET, HOST, HookData, INJECTOR, LView, LViewFlags, NEXT, PARENT, QUERIES, RENDERER, RENDERER_FACTORY, SANITIZER, TData, TVIEW, TView as ITView, T_HOST} from '../interfaces/view';
+import {BINDING_INDEX, CHILD_HEAD, CHILD_TAIL, CLEANUP, CONTEXT, DECLARATION_VIEW, ExpandoInstructions, FLAGS, HEADER_OFFSET, HOST, HookData, INJECTOR, LView, LViewFlags, NEXT, PARENT, QUERIES, RENDERER, RENDERER_FACTORY, SANITIZER, TData, TVIEW, TView as ITView, T_HOST} from '../interfaces/view';
 import {runtimeIsNewStylingInUse} from '../styling_next/state';
 import {DebugStyling as DebugNewStyling, NodeStylingDebug} from '../styling_next/styling_debug';
 import {attachDebugObject} from '../util/debug_utils';
@@ -73,6 +73,7 @@ export function cloneToLView(list: any[]): LView {
  */
 export const TViewConstructor = class TView implements ITView {
   constructor(
+      public tqueries: TQueries|null,
       public id: number,                                     //
       public blueprint: LView,                               //
       public template: ComponentTemplate<{}>|null,           //
@@ -224,8 +225,7 @@ export class LViewDebug {
       next: toDebug(this._raw_lView[NEXT]),
       childTail: toDebug(this._raw_lView[CHILD_TAIL]),
       declarationView: toDebug(this._raw_lView[DECLARATION_VIEW]),
-      contentQueries: this._raw_lView[CONTENT_QUERIES],
-      queries: this._raw_lView[QUERIES],
+      queries: null,
       tHost: this._raw_lView[T_HOST],
       bindingIndex: this._raw_lView[BINDING_INDEX],
     };

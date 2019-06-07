@@ -12,7 +12,7 @@ import {registerPostOrderHooks} from '../hooks';
 import {TAttributes, TNodeFlags, TNodeType} from '../interfaces/node';
 import {RElement} from '../interfaces/renderer';
 import {StylingContext} from '../interfaces/styling';
-import {BINDING_INDEX, HEADER_OFFSET, QUERIES, RENDERER, TVIEW, T_HOST} from '../interfaces/view';
+import {BINDING_INDEX, HEADER_OFFSET, RENDERER, TVIEW, T_HOST} from '../interfaces/view';
 import {assertNodeType} from '../node_assert';
 import {appendChild} from '../node_manipulation';
 import {applyOnCreateInstructions} from '../node_util';
@@ -22,7 +22,7 @@ import {getStylingContextFromLView, hasClassInput, hasStyleInput} from '../styli
 import {registerInitialStylingIntoContext} from '../styling_next/instructions';
 import {runtimeIsNewStylingInUse} from '../styling_next/state';
 import {attrsStylingIndexOf, setUpAttributes} from '../util/attrs_utils';
-import {getNativeByTNode, getTNode} from '../util/view_utils';
+import {getNativeByTNode, getTNode, isContentQueryHost} from '../util/view_utils';
 
 import {createDirectivesAndLocals, elementCreate, executeContentQueries, getOrCreateTNode, initializeTNodeInputs, setInputsForProperty, setNodeStylingTemplate} from './shared';
 import {getActiveDirectiveStylingIndex} from './styling';
@@ -107,6 +107,10 @@ export function ɵɵelementStart(
     if (inputData && inputData.hasOwnProperty('style')) {
       tNode.flags |= TNodeFlags.hasStyleInput;
     }
+
+    if (tView.tqueries !== null) {
+      tView.tqueries.elementStart(tView, tNode);
+    }
   }
 
   // we render the styling again below in case any directives have set any `style` and/or
@@ -120,11 +124,6 @@ export function ɵɵelementStart(
     registerInitialStylingIntoContext(tNode, attrs as TAttributes, lastAttrIndex);
   }
 
-  const currentQueries = lView[QUERIES];
-  if (currentQueries) {
-    currentQueries.addNode(tNode);
-    lView[QUERIES] = currentQueries.clone(tNode);
-  }
   executeContentQueries(tView, tNode, lView);
 }
 
@@ -150,14 +149,15 @@ export function ɵɵelementEnd(): void {
 
   ngDevMode && assertNodeType(previousOrParentTNode, TNodeType.Element);
   const lView = getLView();
-  const currentQueries = lView[QUERIES];
-  // Go back up to parent queries only if queries have been cloned on this element.
-  if (currentQueries && previousOrParentTNode.index === currentQueries.nodeIndex) {
-    lView[QUERIES] = currentQueries.parent;
-  }
+  const tView = lView[TVIEW];
 
-  registerPostOrderHooks(lView[TVIEW], previousOrParentTNode);
+  registerPostOrderHooks(tView, previousOrParentTNode);
   decreaseElementDepthCount();
+
+  if (tView.firstTemplatePass && isContentQueryHost(previousOrParentTNode)) {
+    // TODO(pk): assert that tView.tqueries is not null
+    tView.tqueries !.elementEnd(previousOrParentTNode);
+  }
 
   // this is fired at the end of elementEnd because ALL of the stylingBindings code
   // (for directives and the template) have now executed which means the styling

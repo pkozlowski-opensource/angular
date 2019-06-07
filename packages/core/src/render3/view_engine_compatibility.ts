@@ -67,7 +67,7 @@ export function createElementRef(
 let R3TemplateRef: {
   new (
       _declarationParentView: LView, elementRef: ViewEngine_ElementRef, _tView: TView,
-      _hostLContainer: LContainer, _injectorIndex: number): ViewEngine_TemplateRef<any>
+      declarationContainer: LContainer, _injectorIndex: number): ViewEngine_TemplateRef<any>
 };
 
 /**
@@ -87,9 +87,9 @@ export function injectTemplateRef<T>(
  *
  * @param TemplateRefToken The TemplateRef type
  * @param ElementRefToken The ElementRef type
- * @param hostTNode The node that is requesting a TemplateRef
+ * @param hostTNode The node on which a TemplateRef is requested
  * @param hostView The view to which the node belongs
- * @returns The TemplateRef instance to use
+ * @returns The TemplateRef instance or null if we can't create a TemplateRef on a given node type
  */
 export function createTemplateRef<T>(
     TemplateRefToken: typeof ViewEngine_TemplateRef, ElementRefToken: typeof ViewEngine_ElementRef,
@@ -99,22 +99,20 @@ export function createTemplateRef<T>(
     R3TemplateRef = class TemplateRef_<T> extends TemplateRefToken<T> {
       constructor(
           private _declarationParentView: LView, readonly elementRef: ViewEngine_ElementRef,
-          private _tView: TView, private _hostLContainer: LContainer,
+          private _tView: TView, private declarationContainer: LContainer,
           private _injectorIndex: number) {
         super();
       }
 
       createEmbeddedView(context: T, container?: LContainer, index?: number):
           viewEngine_EmbeddedViewRef<T> {
-        const currentQueries = this._declarationParentView[QUERIES];
-        // Query container may be missing if this view was created in a directive
-        // constructor. Create it now to avoid losing results in embedded views.
-        if (currentQueries && this._hostLContainer[QUERIES] == null) {
-          this._hostLContainer[QUERIES] = currentQueries !.container();
-        }
         const lView = createEmbeddedViewAndNode(
-            this._tView, context, this._declarationParentView, this._hostLContainer[QUERIES],
-            this._injectorIndex);
+            this._tView, context, this._declarationParentView, this._injectorIndex);
+
+        if (this.declarationContainer[QUERIES]) {
+          lView[QUERIES] = this.declarationContainer[QUERIES] !.createView();
+        }
+
         if (container) {
           insertView(lView, container, index !);
         }
@@ -127,11 +125,11 @@ export function createTemplateRef<T>(
   }
 
   if (hostTNode.type === TNodeType.Container) {
-    const hostContainer: LContainer = hostView[hostTNode.index];
     ngDevMode && assertDefined(hostTNode.tViews, 'TView must be allocated');
+    const lContainer = hostView[hostTNode.index] as LContainer;
     return new R3TemplateRef(
         hostView, createElementRef(ElementRefToken, hostTNode, hostView), hostTNode.tViews as TView,
-        hostContainer, hostTNode.injectorIndex);
+        lContainer, hostTNode.injectorIndex);
   } else {
     return null;
   }

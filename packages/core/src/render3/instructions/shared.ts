@@ -23,7 +23,6 @@ import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer} from '../interfaces/c
 import {ComponentDef, ComponentTemplate, DirectiveDef, DirectiveDefListOrFactory, PipeDefListOrFactory, RenderFlags, ViewQueriesFunction} from '../interfaces/definition';
 import {INJECTOR_BLOOM_PARENT_SIZE, NodeInjectorFactory} from '../interfaces/injector';
 import {AttributeMarker, InitialInputData, InitialInputs, LocalRefExtractor, PropertyAliasValue, PropertyAliases, TAttributes, TContainerNode, TElementContainerNode, TElementNode, TIcuContainerNode, TNode, TNodeFlags, TNodeProviderIndexes, TNodeType, TProjectionNode, TViewNode} from '../interfaces/node';
-import {LQueries} from '../interfaces/query';
 import {RComment, RElement, RText, Renderer3, RendererFactory3, isProceduralRenderer} from '../interfaces/renderer';
 import {SanitizerFn} from '../interfaces/sanitization';
 import {StylingContext} from '../interfaces/styling';
@@ -153,16 +152,21 @@ export function setHostBindings(tView: TView, viewData: LView): void {
   }
 }
 
-/** Refreshes content queries for all directives in the given view. */
+/** Refreshes all content queries declared by directives in a given view */
 function refreshContentQueries(tView: TView, lView: LView): void {
-  if (tView.contentQueries != null) {
-    setCurrentQueryIndex(0);
-    for (let i = 0; i < tView.contentQueries.length; i++) {
-      const directiveDefIdx = tView.contentQueries[i];
-      const directiveDef = tView.data[directiveDefIdx] as DirectiveDef<any>;
-      ngDevMode &&
-          assertDefined(directiveDef.contentQueries, 'contentQueries function should be defined');
-      directiveDef.contentQueries !(RenderFlags.Update, lView[directiveDefIdx], directiveDefIdx);
+  const contentQueries = tView.contentQueries;
+  if (contentQueries !== null) {
+    for (let i = 0; i < contentQueries.length; i += 2) {
+      const queryStartIdx = contentQueries[i];
+      const directiveDefIdx = contentQueries[i + 1];
+      // TODO(pk): assert on queryIdx
+      if (directiveDefIdx !== -1) {
+        const directiveDef = tView.data[directiveDefIdx] as DirectiveDef<any>;
+        ngDevMode &&
+            assertDefined(directiveDef.contentQueries, 'contentQueries function should be defined');
+        setCurrentQueryIndex(queryStartIdx);
+        directiveDef.contentQueries !(RenderFlags.Update, lView[directiveDefIdx], directiveDefIdx);
+      }
     }
   }
 }
@@ -356,8 +360,7 @@ export function allocExpando(view: LView, numSlotsToAlloc: number) {
  * Such lViewNode will then be renderer with renderEmbeddedTemplate() (see below).
  */
 export function createEmbeddedViewAndNode<T>(
-    tView: TView, context: T, declarationView: LView, queries: LQueries | null,
-    injectorIndex: number): LView {
+    tView: TView, context: T, declarationView: LView, injectorIndex: number): LView {
   const _isParent = getIsParent();
   const _previousOrParentTNode = getPreviousOrParentTNode();
   setPreviousOrParentTNode(null !, true);
@@ -365,9 +368,6 @@ export function createEmbeddedViewAndNode<T>(
   const lView = createLView(declarationView, tView, context, LViewFlags.CheckAlways, null, null);
   lView[DECLARATION_VIEW] = declarationView;
 
-  if (queries) {
-    lView[QUERIES] = queries.createView();
-  }
   assignTViewNodeToLView(tView, null, -1, lView);
 
   if (tView.firstTemplatePass) {
@@ -600,6 +600,7 @@ export function createTView(
   const blueprint = createViewBlueprint(bindingStartIndex, initialViewLength);
   return blueprint[TVIEW as any] = ngDevMode ?
       new TViewConstructor(
+             null,
              viewIndex,   // id: number,
              blueprint,   // blueprint: LView,
              templateFn,  // template: ComponentTemplate<{}>|null,
@@ -607,7 +608,7 @@ export function createTView(
              null !,      // node: TViewNode|TElementNode|null,
              cloneToTViewData(blueprint).fill(null, bindingStartIndex),  // data: TData,
              bindingStartIndex,  // bindingStartIndex: number,
-             initialViewLength,  // viewQueryStartIndex: number,
+             0,                  // viewQueryStartIndex: number,
              initialViewLength,  // expandoStartIndex: number,
              null,               // expandoInstructions: ExpandoInstructions|null,
              true,               // firstTemplatePass: boolean,
@@ -631,6 +632,7 @@ export function createTView(
              schemas,                                        // schemas: SchemaMetadata[]|null,
              ) :
       {
+        tqueries: null,
         id: viewIndex,
         blueprint: blueprint,
         template: templateFn,
@@ -638,7 +640,7 @@ export function createTView(
         node: null !,
         data: blueprint.slice().fill(null, bindingStartIndex),
         bindingStartIndex: bindingStartIndex,
-        viewQueryStartIndex: initialViewLength,
+        viewQueryStartIndex: 0,
         expandoStartIndex: initialViewLength,
         expandoInstructions: null,
         firstTemplatePass: true,
@@ -1757,8 +1759,8 @@ export function checkView<T>(hostView: LView, component: T) {
 
 function executeViewQueryFn<T>(flags: RenderFlags, tView: TView, component: T): void {
   const viewQuery = tView.viewQuery;
-  if (viewQuery) {
-    setCurrentQueryIndex(tView.viewQueryStartIndex);
+  if (viewQuery !== null) {
+    setCurrentQueryIndex(0);
     viewQuery(flags, component);
   }
 }
