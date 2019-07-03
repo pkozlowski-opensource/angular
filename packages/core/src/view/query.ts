@@ -8,6 +8,7 @@
 
 import {ElementRef} from '../linker/element_ref';
 import {QueryList} from '../linker/query_list';
+import {flatten} from '../util/array_utils'
 
 import {NodeDef, NodeFlags, QueryBindingDef, QueryBindingType, QueryDef, QueryValueType, ViewData, asElementData, asProviderData, asQueryList} from './types';
 import {declaredViewContainer, filterQueryId, isEmbeddedView} from './util';
@@ -106,7 +107,7 @@ export function checkAndUpdateQuery(view: ViewData, nodeDef: NodeDef) {
     newValues = calcQueryValues(view, 0, view.def.nodes.length - 1, nodeDef.query !, []);
     directiveInstance = view.component;
   }
-  queryList.reset(newValues);
+  queryList.reset(flatten(newValues));
   const bindings = nodeDef.query !.bindings;
   let notify = false;
   for (let i = 0; i < bindings.length; i++) {

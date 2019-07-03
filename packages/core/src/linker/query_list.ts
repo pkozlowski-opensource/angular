@@ -9,7 +9,6 @@
 import {Observable} from 'rxjs';
 
 import {EventEmitter} from '../event_emitter';
-import {flatten} from '../util/array_utils';
 import {getSymbolIterator} from '../util/symbol';
 
 function symbolIterator<T>(this: QueryList<T>): Iterator<T> {
@@ -119,10 +118,10 @@ export class QueryList<T>/* implements Iterable<T> */ {
    * on change detection, it will not notify of changes to the queries, unless a new change
    * occurs.
    *
-   * @param resultsTree The results tree to store
+   * @param newResults The query results to store
    */
-  reset(resultsTree: Array<T|any[]>): void {
-    this._results = flatten(resultsTree);
+  reset(newResults: Array<T>): void {
+    this._results = newResults;
     (this as{dirty: boolean}).dirty = false;
     (this as{length: number}).length = this._results.length;
     (this as{last: T}).last = this._results[this.length - 1];
