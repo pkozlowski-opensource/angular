@@ -270,20 +270,19 @@ function materializeNodeResult(lView: LView, tNode: TNode, matchingIdx: number, 
 
 function materializeViewResults(lView: LView, tQuery: TQuery, lQuery: LQuery<any>): any[] {
   const tView = lView[TVIEW];
-  const tQueryMatches = tQuery.matches;
   if (lQuery.matches === null) {
-    const result: any[] = [];
-    if (tQueryMatches !== null) {
-      for (let i = 0; i < tQueryMatches.length; i += 2) {
-        const matchedNodeIdx = tQueryMatches[i];
-        if (matchedNodeIdx < 0) {
-          result.push(null);
-        } else {
-          // TODO(pk): assert on index and TNode
-          const tNode = tView.data[matchedNodeIdx] as TNode;
-          result.push(
-              materializeNodeResult(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read));
-        }
+    // TODO(pk): assert that tQueryMatches is not null
+    const tQueryMatches = tQuery.matches !;
+    const result: any[] = new Array(tQueryMatches.length / 2);
+    for (let i = 0; i < tQueryMatches.length; i += 2) {
+      const matchedNodeIdx = tQueryMatches[i];
+      if (matchedNodeIdx < 0) {
+        result[i / 2] = null;
+      } else {
+        // TODO(pk): assert on index and TNode
+        const tNode = tView.data[matchedNodeIdx] as TNode;
+        result[i / 2] =
+            materializeNodeResult(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read);
       }
     }
     lQuery.matches = result;
@@ -297,12 +296,11 @@ export function buildQueryResults<T>(
   const tView = lView[TVIEW];
   // TODO(pk): assert that tqueries is not null
   const tQuery = tView.tqueries !.queries[queryIndex];
-  const lQuery = lView[QUERIES] !.queries ![queryIndex];
-
-  const lViewResults = materializeViewResults(lView, tQuery, lQuery);
   // TODO(pk): optimise where we can simply return view matches (if there are no containers)
 
   if (tQuery.matches !== null) {
+    const lQuery = lView[QUERIES] !.queries ![queryIndex];
+    const lViewResults = materializeViewResults(lView, tQuery, lQuery);
     for (let i = 0; i < tQuery.matches.length; i += 2) {
       const tNodeIdx = tQuery.matches[i];
       if (tNodeIdx > 0) {
