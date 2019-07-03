@@ -33,7 +33,7 @@ import {createContainerRef, createElementRef, createTemplateRef} from './view_en
 const unusedValueToPlacateAjd = unused1 + unused2 + unused3 + unused4;
 
 class LQuery2_<T> implements LQuery<T> {
-  matches: T[]|null = null;
+  matches: T|null[]|null = null;
   // PERF(pk): we shouldn't need queryList here, it boils down to instructions setup
   constructor(public queryList: QueryList<T>) {}
   get first(): T { return this.queryList.first; }
@@ -113,24 +113,29 @@ class TQueries_ implements TQueries {
     }
   }
   template(tView: TView, tNode: TNode): TQueries|null {
-    const queriesForTemplateRef: TQuery[] = [];
+    let queriesForTemplateRef: TQuery[]|null = null;
 
     for (let i = 0; i < this.queries.length; i++) {
       const tquery = this.queries[i];
       const tqueryClone = tquery.template(tView, tNode);
       if (tqueryClone) {
         tqueryClone.parentQueryIndex = i;
-        queriesForTemplateRef.push(tqueryClone);
+        if (queriesForTemplateRef !== null) {
+          queriesForTemplateRef.push(tqueryClone);
+        } else {
+          queriesForTemplateRef = [tqueryClone];
+        }
       }
     }
 
-    return queriesForTemplateRef.length ? new TQueries_(queriesForTemplateRef) : null;
+    return queriesForTemplateRef !== null ? new TQueries_(queriesForTemplateRef) : null;
   }
 }
 
 class TQuery_ implements TQuery {
   parentQueryIndex = -1;
-  matches: any[]|null = null;
+  matches: number[]|null = null;
+  matchesTemplateDeclaration = false;
 
   /**
    * A node index on which a query was declared (-1 for view queries and ones inherited from the
@@ -170,6 +175,7 @@ class TQuery_ implements TQuery {
       this.addMatch(tNode.index, this.getMatchIndex(tView, tNode));
       // add a TemplateRef marker
       this.addMatch(-tNode.index, -1);
+      this.matchesTemplateDeclaration = true;
       return new TQuery_(this.metadata);
     }
     return null;
@@ -268,12 +274,12 @@ function materializeNodeResult(lView: LView, tNode: TNode, matchingIdx: number, 
   }
 }
 
-function materializeViewResults(lView: LView, tQuery: TQuery, lQuery: LQuery<any>): any[] {
+function materializeViewResults<T>(lView: LView, tQuery: TQuery, lQuery: LQuery<T>): T|null[] {
   const tView = lView[TVIEW];
   if (lQuery.matches === null) {
     // TODO(pk): assert that tQueryMatches is not null
     const tQueryMatches = tQuery.matches !;
-    const result: any[] = new Array(tQueryMatches.length / 2);
+    const result: T|null[] = new Array(tQueryMatches.length / 2);
     for (let i = 0; i < tQueryMatches.length; i += 2) {
       const matchedNodeIdx = tQueryMatches[i];
       if (matchedNodeIdx < 0) {
@@ -291,33 +297,42 @@ function materializeViewResults(lView: LView, tQuery: TQuery, lQuery: LQuery<any
   return lQuery.matches;
 }
 
-export function buildQueryResults<T>(
-    lView: LView, queryIndex: number, result: T[] = []): (T | T[])[] {
+function buildQueryResults<T>(lView: LView, queryIndex: number, result?: T[]): T[] {
   const tView = lView[TVIEW];
   // TODO(pk): assert that tqueries is not null
   const tQuery = tView.tqueries !.queries[queryIndex];
-  // TODO(pk): optimise where we can simply return view matches (if there are no containers)
 
   if (tQuery.matches !== null) {
     const lQuery = lView[QUERIES] !.queries ![queryIndex];
     const lViewResults = materializeViewResults(lView, tQuery, lQuery);
-    for (let i = 0; i < tQuery.matches.length; i += 2) {
-      const tNodeIdx = tQuery.matches[i];
-      if (tNodeIdx > 0) {
-        result.push(lViewResults[i / 2]);
-      } else {
-        // TODO(pk): assert on index and type
-        const declarationLContainer = lView[-tNodeIdx] as LContainer;
-        // TODO(pk): for now assume that the declaration and insertion point is the same
-        for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
-          const embeddedLView = declarationLContainer[j];
-          buildQueryResults(embeddedLView, queryIndex, result);
+
+    if (!tQuery.matchesTemplateDeclaration && result === undefined) {
+      // This particular query didn't match any <ng-template> elements in a view where the query was
+      // declared. In this case we will never have results from embedded views so can just return
+      // results from the query declaration view.
+      return lViewResults;
+    } else {
+      result = result !== undefined ? result : [];
+      for (let i = 0; i < tQuery.matches.length; i += 2) {
+        const tNodeIdx = tQuery.matches[i];
+        if (tNodeIdx > 0) {
+          result.push(lViewResults[i / 2]);
+        } else {
+          // TODO(pk): assert on index and type
+          const declarationLContainer = lView[-tNodeIdx] as LContainer;
+          // TODO(pk): for now assume that the declaration and insertion point is the same
+          for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
+            const embeddedLView = declarationLContainer[j];
+            buildQueryResults(embeddedLView, queryIndex, result);
+          }
         }
       }
+      return result;
     }
   }
 
-  return result;
+  // TODO(pk): can I re-use the same array - I think so!
+  return [];
 }
 
 /**

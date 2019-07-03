@@ -26,12 +26,16 @@ export interface TQuery {
   metadata: TQueryMetadata;
 
   parentQueryIndex: number;
+
   /**
    * Matches collected on the the first template pass. Each match is a pair of:
    * - TNode index
    * - match index (injectable index or -1 for the default read)
    */
   matches: number[]|null;
+
+  // TODO(pk): document
+  matchesTemplateDeclaration: boolean;
 
   elementStart(tView: TView, tNode: TNode): void;
   elementEnd(tNode: TNode): void;
@@ -46,7 +50,7 @@ export interface TQueries {
 }
 
 export interface LQuery<T> {
-  matches: (T|T[])[]|null;
+  matches: T|null[]|null;
   // TODO(pk): remove from the interface, introduce abstraction over storage (setDirty, first)
   // instead
   queryList: QueryList<T>;
