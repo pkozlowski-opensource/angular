@@ -271,7 +271,6 @@ function materializeNodeResult(lView: LView, tNode: TNode, matchingIdx: number, 
 function materializeViewResults(lView: LView, tQuery: TQuery, lQuery: LQuery<any>): any[] {
   const tView = lView[TVIEW];
   const tQueryMatches = tQuery.matches;
-
   if (lQuery.matches === null) {
     const result: any[] = [];
     if (tQueryMatches !== null) {
@@ -363,7 +362,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
  */
 export function ɵɵstaticViewQuery<T>(
     predicate: Type<any>| string[], descend: boolean, read: any): void {
-  viewQueryInternal(getLView(), new TQueryMetadata_(predicate, descend, read, true));
+  viewQueryInternal(getLView(), predicate, descend, read, true);
 }
 
 /**
@@ -376,14 +375,16 @@ export function ɵɵstaticViewQuery<T>(
  * @codeGenApi
  */
 export function ɵɵviewQuery<T>(predicate: Type<any>| string[], descend: boolean, read: any): void {
-  viewQueryInternal(getLView(), new TQueryMetadata_(predicate, descend, read, false));
+  viewQueryInternal(getLView(), predicate, descend, read, false);
 }
 
-function viewQueryInternal<T>(lView: LView, queryMetadata: TQueryMetadata): void {
+function viewQueryInternal<T>(
+    lView: LView, predicate: Type<any>| string[], descend: boolean, read: any,
+    isStatic: boolean): void {
   const tView = lView[TVIEW];
   if (tView.firstTemplatePass) {
-    createTQuery(tView, queryMetadata, -1);
-    if (queryMetadata.isStatic) {
+    createTQuery(tView, new TQueryMetadata_(predicate, descend, read, isStatic), -1);
+    if (isStatic) {
       tView.staticViewQueries = true;
     }
   }
@@ -414,8 +415,7 @@ export function ɵɵloadViewQuery<T>(): QueryList<T> {
 export function ɵɵcontentQuery<T>(
     directiveIndex: number, predicate: Type<any>| string[], descend: boolean, read: any): void {
   contentQueryInternal(
-      getLView(), new TQueryMetadata_(predicate, descend, read, false), getPreviousOrParentTNode(),
-      directiveIndex);
+      getLView(), predicate, descend, read, false, getPreviousOrParentTNode(), directiveIndex);
 }
 
 /**
@@ -433,17 +433,17 @@ export function ɵɵcontentQuery<T>(
 export function ɵɵstaticContentQuery<T>(
     directiveIndex: number, predicate: Type<any>| string[], descend: boolean, read: any): void {
   contentQueryInternal(
-      getLView(), new TQueryMetadata_(predicate, descend, read, true), getPreviousOrParentTNode(),
-      directiveIndex);
+      getLView(), predicate, descend, read, true, getPreviousOrParentTNode(), directiveIndex);
 }
 
 function contentQueryInternal<T>(
-    lView: LView, queryMetadata: TQueryMetadata, tNode: TNode, directiveIndex: number): void {
+    lView: LView, predicate: Type<any>| string[], descend: boolean, read: any, isStatic: boolean,
+    tNode: TNode, directiveIndex: number): void {
   const tView = lView[TVIEW];
   if (tView.firstTemplatePass) {
-    createTQuery(tView, queryMetadata, tNode.index);
+    createTQuery(tView, new TQueryMetadata_(predicate, descend, read, isStatic), tNode.index);
     saveContentQueryAndDirectiveIndex(tView, directiveIndex);
-    if (queryMetadata.isStatic) {
+    if (isStatic) {
       tView.staticContentQueries = true;
     }
   }
