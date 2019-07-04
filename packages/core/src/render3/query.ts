@@ -43,22 +43,24 @@ class LQueries2_ implements LQueries {
   constructor(public queries: LQuery<any>[] = []) {}
 
   declarationContainer(embeddedViewTQueries: TQueries): LQueries|null {
-    const containerLQueries: LQuery<any>[] = [];
+    const containerLQueries: LQuery<any>[] = new Array(embeddedViewTQueries.queries.length);
 
-    for (let tQuery of embeddedViewTQueries.queries) {
+    for (let i = 0; i < embeddedViewTQueries.queries.length; i++) {
+      const tQuery = embeddedViewTQueries.queries[i];
       const parentLQuery = this.queries ![tQuery.parentQueryIndex];
-      const lQueryClone = new LQuery2_(parentLQuery.queryList);
-      containerLQueries.push(lQueryClone);
+      containerLQueries[i] = new LQuery2_(parentLQuery.queryList);
     }
 
     return new LQueries2_(containerLQueries);
   }
 
   createView(): LQueries {
-    const viewLQueries: LQuery<any>[] = [];
-    for (let lQuery of this.queries) {
-      viewLQueries.push(new LQuery2_(lQuery.queryList));
+    const viewLQueries: LQuery<any>[] = new Array(this.queries.length);
+
+    for (let i = 0; i < this.queries.length; i++) {
+      viewLQueries[i] = new LQuery2_(this.queries[i].queryList)
     }
+
     return new LQueries2_(viewLQueries);
   }
 
