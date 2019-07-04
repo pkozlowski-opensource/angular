@@ -548,6 +548,22 @@ describe('tquery logic', () => {
     });
 
   });
+
+  describe('perf debugging', () => {
+
+    it('should not allocate things for a query that does not match but crosses ng-template', () => {
+      @Component({selector: 'test-cmpt', template: '<ng-template [ngIf]="true"></ng-template>'})
+      class TestCmpt {
+        @ViewChild('foo', {static: false}) foo: ElementRef|undefined;
+      }
+
+      TestBed.configureTestingModule({declarations: [TestCmpt]});
+      const fixture = TestBed.createComponent(TestCmpt);
+      fixture.detectChanges(false);
+      expect(fixture.componentInstance.foo).toBeUndefined();
+    });
+
+  });
 });
 
 // TODO:

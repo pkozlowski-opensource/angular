@@ -43,10 +43,12 @@ export interface TQuery {
 }
 
 export interface TQueries {
-  queries: TQuery[];
   elementStart(tView: TView, tNode: TNode): void;
   elementEnd(tNode: TNode): void;
   template(tView: TView, tNode: TNode): TQueries|null;
+  getByIndex(index: number): TQuery;
+  track(tQuery: TQuery): void;
+  length: number;
 }
 
 export interface LQuery<T> {
