@@ -36,29 +36,24 @@ class LQuery2_<T> implements LQuery<T> {
   matches: T|null[]|null = null;
   // PERF(pk): we shouldn't need queryList here, it boils down to instructions setup
   constructor(public queryList: QueryList<T>) {}
-  get first(): T { return this.queryList.first; }
+  clone(): LQuery<T> { return new LQuery2_(this.queryList); }
+  setDirty(): void { this.queryList.setDirty(); }
 }
 
 class LQueries2_ implements LQueries {
   constructor(public queries: LQuery<any>[] = []) {}
 
-  declarationContainer(embeddedViewTQueries: TQueries): LQueries|null {
-    const containerLQueries: LQuery<any>[] = new Array(embeddedViewTQueries.length);
+  embeddedView(tQueries: TQueries): LQueries {
+    const viewLQueries: LQuery<any>[] = new Array(tQueries.length);
 
-    for (let i = 0; i < embeddedViewTQueries.length; i++) {
-      const tQuery = embeddedViewTQueries.getByIndex(i);
-      const parentLQuery = this.queries ![tQuery.parentQueryIndex];
-      containerLQueries[i] = new LQuery2_(parentLQuery.queryList);
-    }
-
-    return new LQueries2_(containerLQueries);
-  }
-
-  createView(): LQueries {
-    const viewLQueries: LQuery<any>[] = new Array(this.queries.length);
-
-    for (let i = 0; i < this.queries.length; i++) {
-      viewLQueries[i] = new LQuery2_(this.queries[i].queryList)
+    for (let i = 0; i < tQueries.length; i++) {
+      const tQuery = tQueries.getByIndex(i);
+      if (tQuery.parentQueryIndex !== -1) {
+        const parentLQuery = this.queries ![tQuery.parentQueryIndex];
+        viewLQueries[i] = parentLQuery.clone();
+      } else {
+        break;
+      }
     }
 
     return new LQueries2_(viewLQueries);
@@ -79,7 +74,7 @@ class LQueries2_ implements LQueries {
       // https://github.com/angular/angular/pull/31312 - remove this check when the mentioned PR
       // lands
       if (tView.firstTemplatePass || tQuery.matches !== null) {
-        lQuery.queryList.setDirty();
+        lQuery.setDirty();
       }
     }
   }
@@ -363,7 +358,6 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
     } else if (!tQuery.matchesTemplateDeclaration) {
       queryList.reset(materializeViewResults(lView, tQuery, queryIndex));
     } else {
-      debugger;
       queryList.reset(collectQueryResults(lView, tQuery, queryIndex, []));
     }
 

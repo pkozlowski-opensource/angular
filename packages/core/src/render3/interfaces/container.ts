@@ -87,12 +87,9 @@ export interface LContainer extends Array<any> {
    */
   [NEXT]: LView|LContainer|null;
 
-  /**
-   * Queries active for this container - all the views inserted to / removed from
-   * this container are reported to queries referenced here.
-   */
-  [QUERIES]: LQueries|null;  // TODO(misko): This is abuse of `LContainer` since we are storing
-  // `[QUERIES]` in it which are not needed for `LContainer` (only needed for Template)
+  // TODO(pk): remove as not needed any more - this will require change to the LView / LContainer
+  // shape
+  [QUERIES]: null;
 
   /**
    * Pointer to the `TNode` which represents the host of the container.

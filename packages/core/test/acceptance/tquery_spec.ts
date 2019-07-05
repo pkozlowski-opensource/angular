@@ -563,6 +563,49 @@ describe('tquery logic', () => {
       expect(fixture.componentInstance.foo).toBeUndefined();
     });
 
+    it('should propagate proper query index with nested embedded views', () => {
+
+      @Directive({selector: 'content-query-host'})
+      class ContentQueryHost {
+        @ContentChildren('foo') foos !: QueryList<ElementRef<any>>;
+      }
+
+      @Component({
+        selector: 'test-cmpt',
+        template: `
+          <ng-template [ngIf]="show">
+            <content-query-host>
+              <ng-template [ngIf]="true"><div #foo></div></ng-template>
+            </content-query-host>
+          </ng-template>
+      `
+      })
+      class TestCmpt {
+        show = false;
+      }
+
+      TestBed.configureTestingModule({declarations: [TestCmpt, ContentQueryHost]});
+      const fixture = TestBed.createComponent(TestCmpt);
+      fixture.detectChanges(false);
+
+      fixture.componentInstance.show = true;
+      fixture.detectChanges(false);
+      expect(fixture.debugElement.query(By.directive(ContentQueryHost))
+                 .injector.get(ContentQueryHost)
+                 .foos.length)
+          .toBe(1);
+
+      fixture.componentInstance.show = false;
+      fixture.detectChanges(false);
+
+      fixture.componentInstance.show = true;
+      fixture.detectChanges(false);
+      expect(fixture.debugElement.query(By.directive(ContentQueryHost))
+                 .injector.get(ContentQueryHost)
+                 .foos.length)
+          .toBe(1);
+    });
+
   });
 });
 

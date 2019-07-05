@@ -10,7 +10,7 @@ import {Type} from '../../interface/type';
 import {QueryList} from '../../linker';
 
 import {TNode} from './node';
-import {TView} from './view';
+import {LView, TView} from './view';
 
 export interface TQueryMetadata {
   predicate: Type<any>|string[];
@@ -56,13 +56,13 @@ export interface LQuery<T> {
   // TODO(pk): remove from the interface, introduce abstraction over storage (setDirty, first)
   // instead
   queryList: QueryList<T>;
-  first: T;
+  clone(): LQuery<T>;
+  setDirty(): void;
 }
 
 export interface LQueries {
   queries: LQuery<any>[];
-  declarationContainer(embeddedViewTQueries: TQueries): LQueries|null;
-  createView(): LQueries;
+  embeddedView(tQueries: TQueries): LQueries;
   insertView(tView: TView): void;
   removeView(tView: TView): void;
 }

@@ -76,16 +76,9 @@ export function ɵɵtemplate(
 
   createDirectivesAndLocals(tView, lView, localRefs, localRefExtractor);
 
-  const embeddedTView = tContainerNode.tViews as TView;
   if (tView.firstTemplatePass && tView.tqueries !== null) {
+    const embeddedTView = tContainerNode.tViews as TView;
     embeddedTView.tqueries = tView.tqueries.template(tView, tContainerNode);
-  }
-
-  // TODO(pk): make it better (lContainer retrieval)
-  if (lView[QUERIES] !== null && embeddedTView.tqueries !== null) {
-    const adjustedIndex = index + HEADER_OFFSET;
-    const lContainer = lView[adjustedIndex];
-    lContainer[QUERIES] = lView[QUERIES] !.declarationContainer(embeddedTView.tqueries);
   }
 
   attachPatchData(getNativeByTNode(tContainerNode, lView), lView);

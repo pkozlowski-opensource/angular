@@ -67,7 +67,7 @@ export function createElementRef(
 let R3TemplateRef: {
   new (
       _declarationParentView: LView, elementRef: ViewEngine_ElementRef, _tView: TView,
-      declarationContainer: LContainer, _injectorIndex: number): ViewEngine_TemplateRef<any>
+      _injectorIndex: number): ViewEngine_TemplateRef<any>
 };
 
 /**
@@ -99,8 +99,7 @@ export function createTemplateRef<T>(
     R3TemplateRef = class TemplateRef_<T> extends TemplateRefToken<T> {
       constructor(
           private _declarationParentView: LView, readonly elementRef: ViewEngine_ElementRef,
-          private _tView: TView, private declarationContainer: LContainer,
-          private _injectorIndex: number) {
+          private _tView: TView, private _injectorIndex: number) {
         super();
       }
 
@@ -109,8 +108,9 @@ export function createTemplateRef<T>(
         const lView = createEmbeddedViewAndNode(
             this._tView, context, this._declarationParentView, this._injectorIndex);
 
-        if (this.declarationContainer[QUERIES]) {
-          lView[QUERIES] = this.declarationContainer[QUERIES] !.createView();
+        if (this._tView.tqueries !== null && this._declarationParentView[QUERIES] !== null) {
+          lView[QUERIES] =
+              this._declarationParentView[QUERIES] !.embeddedView(this._tView.tqueries);
         }
 
         if (container) {
@@ -126,10 +126,9 @@ export function createTemplateRef<T>(
 
   if (hostTNode.type === TNodeType.Container) {
     ngDevMode && assertDefined(hostTNode.tViews, 'TView must be allocated');
-    const lContainer = hostView[hostTNode.index] as LContainer;
     return new R3TemplateRef(
         hostView, createElementRef(ElementRefToken, hostTNode, hostView), hostTNode.tViews as TView,
-        lContainer, hostTNode.injectorIndex);
+        hostTNode.injectorIndex);
   } else {
     return null;
   }
