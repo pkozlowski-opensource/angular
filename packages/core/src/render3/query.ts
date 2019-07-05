@@ -26,8 +26,8 @@ import {unusedValueExportToPlacateAjd as unused1} from './interfaces/definition'
 import {unusedValueExportToPlacateAjd as unused2} from './interfaces/injector';
 import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType, unusedValueExportToPlacateAjd as unused3} from './interfaces/node';
 import {LQueries, LQuery, TQueries, TQuery, TQueryMetadata, unusedValueExportToPlacateAjd as unused4} from './interfaces/query';
-import {HEADER_OFFSET, LView, QUERIES, TVIEW, TView} from './interfaces/view';
-import {getCurrentQueryIndex, getIsParent, getLView, getPreviousOrParentTNode, isCreationMode, setCurrentQueryIndex} from './state';
+import {LView, QUERIES, TVIEW, TView} from './interfaces/view';
+import {getCurrentQueryIndex, getLView, getPreviousOrParentTNode, isCreationMode, setCurrentQueryIndex} from './state';
 import {createContainerRef, createElementRef, createTemplateRef} from './view_engine_compatibility';
 
 const unusedValueToPlacateAjd = unused1 + unused2 + unused3 + unused4;
@@ -109,12 +109,14 @@ class TQueries_ implements TQueries {
       query.elementEnd(tNode);
     }
   }
-  template(tView: TView, tNode: TNode): TQueries|null {
+  embeddedTView(tNode: TNode): TQueries|null {
     let queriesForTemplateRef: TQuery[]|null = null;
 
     for (let i = 0; i < this.queries.length; i++) {
       const tquery = this.queries[i];
-      const tqueryClone = tquery.template(tView, tNode);
+      const tqueryClone = tquery.embeddedTView(
+          tNode, queriesForTemplateRef !== null ? queriesForTemplateRef.length : 0);
+
       if (tqueryClone) {
         tqueryClone.parentQueryIndex = i;
         if (queriesForTemplateRef !== null) {
@@ -126,6 +128,12 @@ class TQueries_ implements TQueries {
     }
 
     return queriesForTemplateRef !== null ? new TQueries_(queriesForTemplateRef) : null;
+  }
+
+  template(tView: TView, tNode: TNode): void {
+    for (let query of this.queries) {
+      query.template(tView, tNode);
+    }
   }
 
   getByIndex(index: number): TQuery {
@@ -175,13 +183,18 @@ class TQuery_ implements TQuery {
     }
   }
 
-  template(tView: TView, tNode: TNode): TQuery|null {
+  template(tView: TView, tNode: TNode): void {
     if (this.isApplyingToNode(tNode)) {
-      // add a template node if it matches
-      this.addMatch(tNode.index, this.getMatchIndex(tView, tNode));
-      // add a TemplateRef marker
-      this.addMatch(-tNode.index, -1);
+      this.addMatchOTemplate(tNode.index, this.getMatchIndex(tView, tNode));
+    }
+  }
+
+  embeddedTView(tNode: TNode, childQueryIndex: number): TQuery|null {
+    if (this.isApplyingToNode(tNode)) {
       this.matchesTemplateDeclaration = true;
+      // add a marker denoting a TemplateRef that can be used to stamp embedded views with query
+      // results
+      this.addMatch(-tNode.index, childQueryIndex);
       return new TQuery_(this.metadata);
     }
     return null;
@@ -224,6 +237,13 @@ class TQuery_ implements TQuery {
       this.matches.push(tNodeIdx, matchIdx);
     }
   }
+
+  private addMatchOTemplate(tNodeIdx: number, matchIdx: number|null) {
+    // TODO(pk): assert on this.matches being defined and length >=2
+    if (matchIdx !== null) {
+      this.matches !.splice(this.matches !.length - 2, 0, tNodeIdx, matchIdx);
+    }
+  }
 }
 
 /**
@@ -236,7 +256,7 @@ class TQuery_ implements TQuery {
  */
 function getIdxOfMatchingSelector(tNode: TNode, selector: string): number|null {
   const localNames = tNode.localNames;
-  if (localNames) {
+  if (localNames !== null) {
     for (let i = 0; i < localNames.length; i += 2) {
       if (localNames[i] === selector) {
         return localNames[i + 1] as number;
@@ -318,14 +338,16 @@ function collectQueryResults<T>(
       result.push(viewResult as T);
     } else {
       // TODO(pk): assert on index and type
+      const childQueryIndex = tQueryMatches[i + 1];
       const declarationLContainer = lView[-tNodeIdx] as LContainer;
       // TODO(pk): for now assume that the declaration and insertion point is the same
       for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
         const embeddedLView = declarationLContainer[j];
         const embeddedTView = embeddedLView[TVIEW];
-        const tquery = embeddedTView.tqueries.queries[queryIndex];
+
+        const tquery = embeddedTView.tqueries.queries[childQueryIndex];
         if (tquery.matches !== null) {
-          collectQueryResults(embeddedLView, tquery, queryIndex, result);
+          collectQueryResults(embeddedLView, tquery, childQueryIndex, result);
         }
       }
     }
@@ -352,6 +374,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
   // TODO(pk): assert that tqueries is not null
   const tQuery = tView.tqueries !.getByIndex(queryIndex);
 
+  debugger;
   if (queryList.dirty && (isCreationMode() === tQuery.metadata.isStatic)) {
     if (tQuery.matches === null) {
       queryList.reset([]);
@@ -483,8 +506,13 @@ function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
 }
 
 function createLQuery<T>(lView: LView) {
+  const queryList = new QueryList<T>();
+
+  // TODO(pk): this is only need if we return QueryList, we shouldn't be doing it for single element
+  storeCleanupWithContext(lView, queryList, queryList.destroy);
+
   if (lView[QUERIES] === null) lView[QUERIES] = new LQueries2_();
-  lView[QUERIES] !.queries.push(new LQuery2_(new QueryList<T>()));
+  lView[QUERIES] !.queries.push(new LQuery2_(queryList));
 }
 
 function createTQuery(tView: TView, metadata: TQueryMetadata, nodeIndex: number): void {

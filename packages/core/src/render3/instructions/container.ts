@@ -70,15 +70,17 @@ export function ɵɵtemplate(
   // TODO: consider a separate node type for templates
   const tContainerNode = containerInternal(index, tagName || null, attrs || null);
   if (tView.firstTemplatePass) {
-    tContainerNode.tViews = createTView(
+    const embeddedTView = tContainerNode.tViews = createTView(
         -1, templateFn, consts, vars, tView.directiveRegistry, tView.pipeRegistry, null, null);
+    if (tView.tqueries !== null) {
+      embeddedTView.tqueries = tView.tqueries.embeddedTView(tContainerNode);
+    }
   }
 
   createDirectivesAndLocals(tView, lView, localRefs, localRefExtractor);
 
   if (tView.firstTemplatePass && tView.tqueries !== null) {
-    const embeddedTView = tContainerNode.tViews as TView;
-    embeddedTView.tqueries = tView.tqueries.template(tView, tContainerNode);
+    tView.tqueries.template(tView, tContainerNode)
   }
 
   attachPatchData(getNativeByTNode(tContainerNode, lView), lView);

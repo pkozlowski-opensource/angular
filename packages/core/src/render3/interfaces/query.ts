@@ -10,7 +10,7 @@ import {Type} from '../../interface/type';
 import {QueryList} from '../../linker';
 
 import {TNode} from './node';
-import {LView, TView} from './view';
+import {TView} from './view';
 
 export interface TQueryMetadata {
   predicate: Type<any>|string[];
@@ -39,13 +39,15 @@ export interface TQuery {
 
   elementStart(tView: TView, tNode: TNode): void;
   elementEnd(tNode: TNode): void;
-  template(tView: TView, tNode: TNode): TQuery|null;
+  template(tView: TView, tNode: TNode): void;
+  embeddedTView(tNode: TNode, childQueryIndex: number): TQuery|null;
 }
 
 export interface TQueries {
   elementStart(tView: TView, tNode: TNode): void;
   elementEnd(tNode: TNode): void;
-  template(tView: TView, tNode: TNode): TQueries|null;
+  template(tView: TView, tNode: TNode): void;
+  embeddedTView(tNode: TNode): TQueries|null;
   getByIndex(index: number): TQuery;
   track(tQuery: TQuery): void;
   length: number;

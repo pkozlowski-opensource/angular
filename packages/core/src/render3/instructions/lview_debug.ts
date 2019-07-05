@@ -81,7 +81,6 @@ export const TViewConstructor = class TView implements ITView {
       public node: TViewNode|TElementNode|null,              //
       public data: TData,                                    //
       public bindingStartIndex: number,                      //
-      public viewQueryStartIndex: number,                    //
       public expandoStartIndex: number,                      //
       public expandoInstructions: ExpandoInstructions|null,  //
       public firstTemplatePass: boolean,                     //

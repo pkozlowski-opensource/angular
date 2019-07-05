@@ -607,6 +607,33 @@ describe('tquery logic', () => {
     });
 
   });
+
+  describe('non-regression', () => {
+
+    it('should not leak content queries on ng-template', () => {
+      @Directive({selector: '[content-query]'})
+      class ContentQueryDir {
+        @ContentChild('foo', {static: true}) foo !: ElementRef<any>;
+      }
+
+      @Component({
+        selector: 'test-cmpt',
+        template: '<ng-template content-query></ng-template><div #foo></div>'
+      })
+      class TestCmpt {
+      }
+
+      TestBed.configureTestingModule({declarations: [TestCmpt, ContentQueryDir]});
+      const fixture = TestBed.createComponent(TestCmpt);
+      fixture.detectChanges(false);
+
+      const ngTemplateEl = fixture.debugElement.childNodes[0];
+      const dirInstance = ngTemplateEl.injector.get(ContentQueryDir);
+
+      expect(dirInstance.foo).toBeUndefined();
+    });
+
+  });
 });
 
 // TODO:

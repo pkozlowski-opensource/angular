@@ -55,11 +55,11 @@ describe('ViewContainerRef', () => {
     });
 
     it('should ensure results in views created in constructors do not appear before template node results',
-       () => {
-         const fixture = TestBed.createComponent(ConstructorAppWithQueries);
-         fixture.detectChanges();
-         expect(fixture.componentInstance.foo).toBeAnInstanceOf(TemplateRef);
-       });
+        () => {
+          const fixture = TestBed.createComponent(ConstructorAppWithQueries);
+          fixture.detectChanges();
+          expect(fixture.componentInstance.foo).toBeAnInstanceOf(TemplateRef);
+        });
 
     it('should use comment node of host ng-container as insertion marker', () => {
       @Component({template: 'hello'})

@@ -45,7 +45,7 @@ export const CHILD_TAIL = 15;
 export const DECLARATION_VIEW = 16;
 export const PREORDER_HOOK_FLAGS = 17;
 /** Size of LView's header. Necessary to adjust for it when setting slots.  */
-export const HEADER_OFFSET = 20;
+export const HEADER_OFFSET = 18;
 
 
 // This interface replaces the real LView interface if it is an arg or a
@@ -407,19 +407,6 @@ export interface TView {
    * refresh after creation mode to collect static query results.
    */
   staticContentQueries: boolean;
-
-  /**
-   * The index where the viewQueries section of `LView` begins. This section contains
-   * view queries defined for a component/directive.
-   *
-   * We store this start index so we know where the list of view queries starts.
-   * This is required when we invoke view queries at runtime. We invoke queries one by one and
-   * increment query index after each iteration. This information helps us to reset index back to
-   * the beginning of view query list before we invoke view queries again.
-   */
-  // TODO(pk): rename to view query count or content query start - it has different meaning and use
-  // now
-  viewQueryStartIndex: number;
 
   /**
    * A reference to the first child node located in the view.
