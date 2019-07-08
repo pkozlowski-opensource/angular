@@ -159,7 +159,6 @@ function refreshContentQueries(tView: TView, lView: LView): void {
     for (let i = 0; i < contentQueries.length; i += 2) {
       const queryStartIdx = contentQueries[i];
       const directiveDefIdx = contentQueries[i + 1];
-      // TODO(pk): assert on queryIdx
       if (directiveDefIdx !== -1) {
         const directiveDef = tView.data[directiveDefIdx] as DirectiveDef<any>;
         ngDevMode &&

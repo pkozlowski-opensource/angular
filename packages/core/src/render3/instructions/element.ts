@@ -154,8 +154,8 @@ export function ɵɵelementEnd(): void {
   registerPostOrderHooks(tView, previousOrParentTNode);
   decreaseElementDepthCount();
 
-  if (tView.firstTemplatePass && isContentQueryHost(previousOrParentTNode)) {
-    // TODO(pk): assert that tView.tqueries is not null
+  if (tView.firstTemplatePass && tView.tqueries !== null &&
+      isContentQueryHost(previousOrParentTNode)) {
     tView.tqueries !.elementEnd(previousOrParentTNode);
   }
 

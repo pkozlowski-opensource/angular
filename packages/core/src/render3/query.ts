@@ -14,12 +14,8 @@ import {ElementRef as ViewEngine_ElementRef} from '../linker/element_ref';
 import {QueryList} from '../linker/query_list';
 import {TemplateRef as ViewEngine_TemplateRef} from '../linker/template_ref';
 import {ViewContainerRef} from '../linker/view_container_ref';
-import {assertDataInRange, assertDefined, assertEqual} from '../util/assert';
-
-import {assertPreviousIsParent} from './assert';
+import {assertDataInRange, assertDefined, assertGreaterThan} from '../util/assert';
 import {getNodeInjectable, locateDirectiveOrProvider} from './di';
-import {NG_ELEMENT_ID} from './fields';
-import {store} from './instructions/all';
 import {storeCleanupWithContext} from './instructions/shared';
 import {CONTAINER_HEADER_OFFSET, LContainer} from './interfaces/container';
 import {unusedValueExportToPlacateAjd as unused1} from './interfaces/definition';
@@ -27,6 +23,7 @@ import {unusedValueExportToPlacateAjd as unused2} from './interfaces/injector';
 import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType, unusedValueExportToPlacateAjd as unused3} from './interfaces/node';
 import {LQueries, LQuery, TQueries, TQuery, TQueryMetadata, unusedValueExportToPlacateAjd as unused4} from './interfaces/query';
 import {LView, QUERIES, TVIEW, TView} from './interfaces/view';
+import {assertNodeOfPossibleTypes} from './node_assert';
 import {getCurrentQueryIndex, getLView, getPreviousOrParentTNode, isCreationMode, setCurrentQueryIndex} from './state';
 import {createContainerRef, createElementRef, createTemplateRef} from './view_engine_compatibility';
 
@@ -66,11 +63,9 @@ class LQueries2_ implements LQueries {
   private dirtyQueriesWithMatches(tView: TView) {
     for (let i = 0; i < this.queries.length; i++) {
       const lQuery = this.queries[i];
-      // TODO(pk): assert on tqueries presence
-      const tQuery = tView.tqueries !.getByIndex(i);
+      const tQuery = getTQuery(tView, i);
       // TODO(pk): firstTemplatePass check is here since the view insertion happens before a
-      // template is processed
-      // I think that this is another bug that I should fix via
+      // template is processed I think that this is another bug that I should fix via
       // https://github.com/angular/angular/pull/31312 - remove this check when the mentioned PR
       // lands
       if (tView.firstTemplatePass || tQuery.matches !== null) {
@@ -137,7 +132,7 @@ class TQueries_ implements TQueries {
   }
 
   getByIndex(index: number): TQuery {
-    // TODO(pk): assert that index in range
+    ngDevMode && assertDataInRange(this.queries, index);
     return this.queries[index];
   }
 
@@ -267,7 +262,7 @@ function getIdxOfMatchingSelector(tNode: TNode, selector: string): number|null {
 }
 
 
-function queryByTNodeType(tNode: TNode, currentView: LView): any {
+function createResultByTNodeType(tNode: TNode, currentView: LView): any {
   if (tNode.type === TNodeType.Element || tNode.type === TNodeType.ElementContainer) {
     return createElementRef(ViewEngine_ElementRef, tNode, currentView);
   } else if (tNode.type === TNodeType.Container) {
@@ -277,25 +272,25 @@ function queryByTNodeType(tNode: TNode, currentView: LView): any {
 }
 
 
-function materializeNodeResult(lView: LView, tNode: TNode, matchingIdx: number, read: any): any {
+function createResultForNode(lView: LView, tNode: TNode, matchingIdx: number, read: any): any {
   if (matchingIdx === -1) {
     // if read token and / or strategy is not specified, detect it using appropriate tNode type
-    return queryByTNodeType(tNode, lView);
+    return createResultByTNodeType(tNode, lView);
   } else if (matchingIdx === -2) {
+    // read a special token from a node injector
     if (read === ViewEngine_ElementRef) {
       return createElementRef(ViewEngine_ElementRef, tNode, lView);
     } else if (read === ViewEngine_TemplateRef) {
       return createTemplateRef(ViewEngine_TemplateRef, ViewEngine_ElementRef, tNode, lView);
     } else if (read === ViewContainerRef) {
-      // TODO(pk): assert on potential node type
+      ngDevMode && assertNodeOfPossibleTypes(
+                       tNode, TNodeType.Element, TNodeType.Container, TNodeType.ElementContainer);
       return createContainerRef(
           ViewContainerRef, ViewEngine_ElementRef,
           tNode as TElementNode | TContainerNode | TElementContainerNode, lView);
-    } else {
-      // TODO(pk): assert on special token type or throw here (dev mode only)
     }
   } else {
-    // assert matchingIdx > -1 (dev mode only) - or assert not 0 earlier on
+    // read a token
     return getNodeInjectable(lView[TVIEW].data, lView, matchingIdx, tNode as TElementNode);
   }
 }
@@ -312,10 +307,10 @@ function materializeViewResults<T>(lView: LView, tQuery: TQuery, queryIndex: num
       if (matchedNodeIdx < 0) {
         result[i / 2] = null;
       } else {
-        // TODO(pk): assert on index and TNode
+        // TODO(pk): assert on index and TNode or use an existing utility function
         const tNode = tView.data[matchedNodeIdx] as TNode;
         result[i / 2] =
-            materializeNodeResult(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read);
+            createResultForNode(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read);
       }
     }
     lQuery.matches = result;
@@ -327,19 +322,24 @@ function materializeViewResults<T>(lView: LView, tQuery: TQuery, queryIndex: num
 // TODO(pk): document, make it obvious that this is only for views hierarchy
 function collectQueryResults<T>(
     lView: LView, tQuery: TQuery, queryIndex: number, result: T[]): T[] {
-  const lViewResults = materializeViewResults<T>(lView, tQuery, queryIndex);
-  // TODO(pk): assert
+  ngDevMode &&
+      assertDefined(
+          tQuery.matches, 'Query results can only be collected for queries with existing matches.');
+
   const tQueryMatches = tQuery.matches !;
+  const lViewResults = materializeViewResults<T>(lView, tQuery, queryIndex);
+
   for (let i = 0; i < tQueryMatches.length; i += 2) {
     const tNodeIdx = tQueryMatches[i];
     if (tNodeIdx > 0) {
       const viewResult = lViewResults[i / 2];
-      // TODO(pk): assert that this is not null
+      ngDevMode && assertDefined(viewResult, 'materialized query result should be defined')
       result.push(viewResult as T);
     } else {
-      // TODO(pk): assert on index and type
+      ngDevMode && assertDataInRange(tQueryMatches, i + 1);
       const childQueryIndex = tQueryMatches[i + 1];
       const declarationLContainer = lView[-tNodeIdx] as LContainer;
+
       // TODO(pk): for now assume that the declaration and insertion point is the same
       for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
         const embeddedLView = declarationLContainer[j];
@@ -371,10 +371,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
 
   setCurrentQueryIndex(queryIndex + 1);
 
-  // TODO(pk): assert that tqueries is not null
-  const tQuery = tView.tqueries !.getByIndex(queryIndex);
-
-  debugger;
+  const tQuery = getTQuery(tView, queryIndex);
   if (queryList.dirty && (isCreationMode() === tQuery.metadata.isStatic)) {
     if (tQuery.matches === null) {
       queryList.reset([]);
@@ -501,7 +498,10 @@ export function ɵɵloadContentQuery<T>(): QueryList<T> {
 }
 
 function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
-  // TODO(pk): asserts (presence of queries, index)
+  ngDevMode &&
+      assertDefined(lView[QUERIES], 'LQueries should be defined when trying to load a query');
+  // TODO(pk): create a getter on LQueries and a utility method
+  ngDevMode && assertDataInRange(lView[QUERIES] !.queries, queryIndex);
   return lView[QUERIES] !.queries[queryIndex].queryList;
 }
 
@@ -527,4 +527,9 @@ function saveContentQueryAndDirectiveIndex(tView: TView, directiveIndex: number)
   if (directiveIndex !== lastSavedDirectiveIndex) {
     tViewContentQueries.push(tView.tqueries !.length - 1, directiveIndex);
   }
+}
+
+function getTQuery(tView: TView, index: number): TQuery {
+  ngDevMode && assertDefined(tView.tqueries, 'TQueries must be defined to retrieve a TQuery');
+  return tView.tqueries !.getByIndex(index);
 }

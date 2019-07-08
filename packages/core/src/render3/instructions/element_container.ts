@@ -5,7 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {assertDataInRange, assertEqual} from '../../util/assert';
+import {assertDataInRange, assertDefined, assertEqual} from '../../util/assert';
 import {assertHasParent} from '../assert';
 import {attachPatchData} from '../context_discovery';
 import {registerPostOrderHooks} from '../hooks';
@@ -18,6 +18,7 @@ import {getIsParent, getLView, getPreviousOrParentTNode, setIsNotParent, setPrev
 import {isContentQueryHost} from '../util/view_utils';
 
 import {createDirectivesAndLocals, executeContentQueries, getOrCreateTNode, setNodeStylingTemplate} from './shared';
+
 
 
 /**
@@ -96,9 +97,9 @@ export function ɵɵelementContainerEnd(): void {
 
   registerPostOrderHooks(tView, previousOrParentTNode);
 
-  if (tView.firstTemplatePass && isContentQueryHost(previousOrParentTNode)) {
-    // TODO(pk): assert that tView.tqueries is not null
-    tView.tqueries !.elementEnd(previousOrParentTNode);
+  if (tView.firstTemplatePass && tView.tqueries !== null &&
+      isContentQueryHost(previousOrParentTNode)) {
+    tView.tqueries.elementEnd(previousOrParentTNode);
   }
 }
 
