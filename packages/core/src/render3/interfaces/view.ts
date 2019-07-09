@@ -43,9 +43,10 @@ export const SANITIZER = 13;
 export const CHILD_HEAD = 14;
 export const CHILD_TAIL = 15;
 export const DECLARATION_VIEW = 16;
-export const PREORDER_HOOK_FLAGS = 17;
+export const DECLARATION_LCONTAINER = 17;
+export const PREORDER_HOOK_FLAGS = 18;
 /** Size of LView's header. Necessary to adjust for it when setting slots.  */
-export const HEADER_OFFSET = 18;
+export const HEADER_OFFSET = 19;
 
 
 // This interface replaces the real LView interface if it is an arg or a
@@ -207,6 +208,8 @@ export interface LView extends Array<any> {
    * context.
    */
   [DECLARATION_VIEW]: LView|null;
+
+  [DECLARATION_LCONTAINER]: LContainer|null;
 
   /**
    * More flags for this view. See PreOrderHookFlags for more info.

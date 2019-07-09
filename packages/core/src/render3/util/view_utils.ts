@@ -13,7 +13,7 @@ import {ComponentDef, DirectiveDef} from '../interfaces/definition';
 import {TNode, TNodeFlags} from '../interfaces/node';
 import {RNode} from '../interfaces/renderer';
 import {StylingContext} from '../interfaces/styling';
-import {FLAGS, HEADER_OFFSET, HOST, LView, LViewFlags, PARENT, PREORDER_HOOK_FLAGS, TData, TVIEW} from '../interfaces/view';
+import {DECLARATION_LCONTAINER, FLAGS, HEADER_OFFSET, HOST, LView, LViewFlags, PARENT, PREORDER_HOOK_FLAGS, TData, TVIEW} from '../interfaces/view';
 
 
 

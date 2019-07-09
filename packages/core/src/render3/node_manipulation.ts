@@ -11,18 +11,18 @@ import {assertDefined, assertDomNode} from '../util/assert';
 
 import {assertLContainer, assertLView} from './assert';
 import {attachPatchData} from './context_discovery';
-import {CONTAINER_HEADER_OFFSET, LContainer, NATIVE, unusedValueExportToPlacateAjd as unused1} from './interfaces/container';
+import {CONTAINER_HEADER_OFFSET, LContainer, NATIVE, PROJECTED_VIEWS, unusedValueExportToPlacateAjd as unused1} from './interfaces/container';
 import {ComponentDef} from './interfaces/definition';
 import {NodeInjectorFactory} from './interfaces/injector';
 import {TElementContainerNode, TElementNode, TIcuContainerNode, TNode, TNodeFlags, TNodeType, TProjectionNode, TViewNode, unusedValueExportToPlacateAjd as unused2} from './interfaces/node';
 import {unusedValueExportToPlacateAjd as unused3} from './interfaces/projection';
 import {ProceduralRenderer3, RElement, RNode, RText, Renderer3, isProceduralRenderer, unusedValueExportToPlacateAjd as unused4} from './interfaces/renderer';
 import {StylingContext} from './interfaces/styling';
-import {CHILD_HEAD, CLEANUP, FLAGS, HOST, HookData, LView, LViewFlags, NEXT, PARENT, QUERIES, RENDERER, TVIEW, T_HOST, unusedValueExportToPlacateAjd as unused5} from './interfaces/view';
+import {CHILD_HEAD, CLEANUP, DECLARATION_LCONTAINER, FLAGS, HOST, HookData, LView, LViewFlags, NEXT, PARENT, QUERIES, RENDERER, TVIEW, T_HOST, unusedValueExportToPlacateAjd as unused5} from './interfaces/view';
 import {assertNodeOfPossibleTypes, assertNodeType} from './node_assert';
 import {renderStringify} from './util/misc_utils';
 import {findComponentView, getLViewParent} from './util/view_traversal_utils';
-import {getNativeByTNode, isLContainer, isLView, isRootView, unwrapRNode, viewAttachedToContainer} from './util/view_utils';
+import {getNativeByTNode, isLContainer, isLView, isRootView, unwrapRNode} from './util/view_utils';
 
 
 const unusedValueToPlacateAjd = unused1 + unused2 + unused3 + unused4 + unused5;
@@ -218,6 +218,12 @@ export function insertView(lView: LView, lContainer: LContainer, index: number) 
 
   lView[PARENT] = lContainer;
 
+  // track views where declaration and insertion points are different
+  const declarationLContainer = lView[DECLARATION_LCONTAINER];
+  if (declarationLContainer !== null && lContainer !== declarationLContainer) {
+    trackProjectedView(declarationLContainer, lView);
+  }
+
   // notify query that a new view has been added
   if (lView[QUERIES] !== null) {
     lView[QUERIES] !.insertView(lView[TVIEW]);
@@ -225,6 +231,28 @@ export function insertView(lView: LView, lContainer: LContainer, index: number) 
 
   // Sets the attached flag
   lView[FLAGS] |= LViewFlags.Attached;
+}
+
+/**
+ * Track views created from the declaration container (TemplateRef) and inserted into a
+ * ViewContainerRef on a different node.
+ */
+function trackProjectedView(declarationContainer: LContainer, lView: LView) {
+  ngDevMode && assertLContainer(declarationContainer);
+  const declaredViews = declarationContainer[PROJECTED_VIEWS];
+  if (declaredViews === null) {
+    declarationContainer[PROJECTED_VIEWS] = [lView];
+  } else {
+    declaredViews.push(lView);
+  }
+}
+
+function detachProjectedView(declarationContainer: LContainer, lView: LView) {
+  ngDevMode && assertLContainer(declarationContainer);
+  // TODO(pk): assert on !
+  const declaredViews = declarationContainer[PROJECTED_VIEWS] !;
+  const declaredViewIndex = declaredViews.indexOf(lView);
+  declaredViews.splice(declaredViewIndex, 1);
 }
 
 /**
@@ -242,7 +270,14 @@ export function detachView(lContainer: LContainer, removeIndex: number): LView|u
 
   const indexInContainer = CONTAINER_HEADER_OFFSET + removeIndex;
   const viewToDetach = lContainer[indexInContainer];
+
   if (viewToDetach) {
+    const declarationLContainer = viewToDetach[DECLARATION_LCONTAINER];
+    if (declarationLContainer !== null && declarationLContainer !== lContainer) {
+      detachProjectedView(declarationLContainer, viewToDetach);
+    }
+
+
     if (removeIndex > 0) {
       lContainer[indexInContainer - 1][NEXT] = viewToDetach[NEXT] as LView;
     }
@@ -344,9 +379,19 @@ function cleanUpView(view: LView | LContainer): void {
       ngDevMode && ngDevMode.rendererDestroy++;
       (view[RENDERER] as ProceduralRenderer3).destroy();
     }
-    // For embedded views still attached to a container: remove query result from this view.
-    if (viewAttachedToContainer(view) && view[QUERIES] !== null) {
-      view[QUERIES] !.removeView(view[TVIEW]);
+
+    const declarationContainer = view[DECLARATION_LCONTAINER];
+    // we are dealing with an embedded view that is still inserted into a container
+    if (declarationContainer !== null && isLContainer(view[PARENT])) {
+      // and this is a projected view
+      if (declarationContainer !== view[PARENT]) {
+        detachProjectedView(declarationContainer, view);
+      }
+
+      // For embedded views still attached to a container: remove query result from this view.
+      if (view[QUERIES] !== null) {
+        view[QUERIES] !.removeView(view[TVIEW]);
+      }
     }
   }
 }

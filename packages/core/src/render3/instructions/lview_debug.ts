@@ -14,7 +14,7 @@ import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer, NATIVE} from '../inte
 import {DirectiveDefList, PipeDefList, ViewQueriesFunction} from '../interfaces/definition';
 import {COMMENT_MARKER, ELEMENT_MARKER, I18nMutateOpCode, I18nMutateOpCodes, I18nUpdateOpCode, I18nUpdateOpCodes, TIcu} from '../interfaces/i18n';
 import {TElementNode, TNode, TViewNode} from '../interfaces/node';
-import {LQueries, TQueries} from '../interfaces/query';
+import {TQueries} from '../interfaces/query';
 import {RComment, RElement} from '../interfaces/renderer';
 import {StylingContext} from '../interfaces/styling';
 import {BINDING_INDEX, CHILD_HEAD, CHILD_TAIL, CLEANUP, CONTEXT, DECLARATION_VIEW, ExpandoInstructions, FLAGS, HEADER_OFFSET, HOST, HookData, INJECTOR, LView, LViewFlags, NEXT, PARENT, QUERIES, RENDERER, RENDERER_FACTORY, SANITIZER, TData, TVIEW, TView as ITView, T_HOST} from '../interfaces/view';
@@ -299,7 +299,8 @@ export class LContainerDebug {
         .map(toDebug as(l: LView) => LViewDebug);
   }
   get parent(): LViewDebug|LContainerDebug|null { return toDebug(this._raw_lContainer[PARENT]); }
-  get queries(): LQueries|null { return this._raw_lContainer[QUERIES]; }
+  // TODO(pk): this doesn't hold queries any more (!)
+  get queries(): LView[]|null { return this._raw_lContainer[QUERIES]; }
   get host(): RElement|RComment|StylingContext|LView { return this._raw_lContainer[HOST]; }
   get native(): RComment { return this._raw_lContainer[NATIVE]; }
   get __other__() {

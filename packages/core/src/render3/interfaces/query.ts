@@ -64,7 +64,7 @@ export interface LQuery<T> {
 
 export interface LQueries {
   queries: LQuery<any>[];
-  embeddedView(tQueries: TQueries): LQueries;
+  createEmbeddedView(tQueries: TQueries): LQueries;
   insertView(tView: TView): void;
   removeView(tView: TView): void;
 }

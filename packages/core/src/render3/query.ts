@@ -14,15 +14,16 @@ import {ElementRef as ViewEngine_ElementRef} from '../linker/element_ref';
 import {QueryList} from '../linker/query_list';
 import {TemplateRef as ViewEngine_TemplateRef} from '../linker/template_ref';
 import {ViewContainerRef} from '../linker/view_container_ref';
-import {assertDataInRange, assertDefined, assertGreaterThan} from '../util/assert';
+import {assertDataInRange, assertDefined} from '../util/assert';
+import {assertLContainer} from './assert';
 import {getNodeInjectable, locateDirectiveOrProvider} from './di';
 import {storeCleanupWithContext} from './instructions/shared';
-import {CONTAINER_HEADER_OFFSET, LContainer} from './interfaces/container';
+import {CONTAINER_HEADER_OFFSET, LContainer, PROJECTED_VIEWS} from './interfaces/container';
 import {unusedValueExportToPlacateAjd as unused1} from './interfaces/definition';
 import {unusedValueExportToPlacateAjd as unused2} from './interfaces/injector';
 import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType, unusedValueExportToPlacateAjd as unused3} from './interfaces/node';
 import {LQueries, LQuery, TQueries, TQuery, TQueryMetadata, unusedValueExportToPlacateAjd as unused4} from './interfaces/query';
-import {LView, QUERIES, TVIEW, TView} from './interfaces/view';
+import {DECLARATION_LCONTAINER, LView, PARENT, QUERIES, TVIEW, TView} from './interfaces/view';
 import {assertNodeOfPossibleTypes} from './node_assert';
 import {getCurrentQueryIndex, getLView, getPreviousOrParentTNode, isCreationMode, setCurrentQueryIndex} from './state';
 import {createContainerRef, createElementRef, createTemplateRef} from './view_engine_compatibility';
@@ -40,7 +41,7 @@ class LQuery2_<T> implements LQuery<T> {
 class LQueries2_ implements LQueries {
   constructor(public queries: LQuery<any>[] = []) {}
 
-  embeddedView(tQueries: TQueries): LQueries {
+  createEmbeddedView(tQueries: TQueries): LQueries {
     const viewLQueries: LQuery<any>[] = new Array(tQueries.length);
 
     for (let i = 0; i < tQueries.length; i++) {
@@ -49,6 +50,7 @@ class LQueries2_ implements LQueries {
         const parentLQuery = this.queries ![tQuery.parentQueryIndex];
         viewLQueries[i] = parentLQuery.clone();
       } else {
+        // TODO(pk): why do we have it here? How would I document it?
         break;
       }
     }
@@ -62,14 +64,13 @@ class LQueries2_ implements LQueries {
 
   private dirtyQueriesWithMatches(tView: TView) {
     for (let i = 0; i < this.queries.length; i++) {
-      const lQuery = this.queries[i];
       const tQuery = getTQuery(tView, i);
       // TODO(pk): firstTemplatePass check is here since the view insertion happens before a
       // template is processed I think that this is another bug that I should fix via
       // https://github.com/angular/angular/pull/31312 - remove this check when the mentioned PR
       // lands
-      if (tView.firstTemplatePass || tQuery.matches !== null) {
-        lQuery.setDirty();
+      if (tQuery.matches !== null || tView.firstTemplatePass) {
+        this.queries[i].setDirty();
       }
     }
   }
@@ -333,21 +334,33 @@ function collectQueryResults<T>(
     const tNodeIdx = tQueryMatches[i];
     if (tNodeIdx > 0) {
       const viewResult = lViewResults[i / 2];
-      ngDevMode && assertDefined(viewResult, 'materialized query result should be defined')
+      ngDevMode && assertDefined(viewResult, 'materialized query result should be defined');
       result.push(viewResult as T);
     } else {
-      ngDevMode && assertDataInRange(tQueryMatches, i + 1);
       const childQueryIndex = tQueryMatches[i + 1];
+
       const declarationLContainer = lView[-tNodeIdx] as LContainer;
+      ngDevMode && assertLContainer(declarationLContainer);
 
-      // TODO(pk): for now assume that the declaration and insertion point is the same
-      for (let j = CONTAINER_HEADER_OFFSET; j < declarationLContainer.length; j++) {
-        const embeddedLView = declarationLContainer[j];
-        const embeddedTView = embeddedLView[TVIEW];
+      for (let i = CONTAINER_HEADER_OFFSET; i < declarationLContainer.length; i++) {
+        const embeddedLView = declarationLContainer[i];
+        // TODO(pk): extract condition in this if statement into a utility function
+        if (embeddedLView[DECLARATION_LCONTAINER] === embeddedLView[PARENT]) {
+          const embeddedTView = embeddedLView[TVIEW];
+          const tquery = getTQuery(embeddedTView, childQueryIndex);
+          if (tquery.matches !== null) {
+            collectQueryResults(embeddedLView, tquery, childQueryIndex, result);
+          }
+        }
+      }
 
-        const tquery = embeddedTView.tqueries.queries[childQueryIndex];
-        if (tquery.matches !== null) {
-          collectQueryResults(embeddedLView, tquery, childQueryIndex, result);
+      if (declarationLContainer[PROJECTED_VIEWS] !== null) {
+        for (let embeddedLView of declarationLContainer[PROJECTED_VIEWS] !) {
+          const embeddedTView = embeddedLView[TVIEW];
+          const tquery = getTQuery(embeddedTView, childQueryIndex);
+          if (tquery.matches !== null) {
+            collectQueryResults(embeddedLView, tquery, childQueryIndex, result);
+          }
         }
       }
     }

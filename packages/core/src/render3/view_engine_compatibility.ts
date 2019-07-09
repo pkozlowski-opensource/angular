@@ -17,12 +17,13 @@ import {EmbeddedViewRef as viewEngine_EmbeddedViewRef, ViewRef as viewEngine_Vie
 import {Renderer2} from '../render/api';
 import {assertDefined, assertGreaterThan, assertLessThan} from '../util/assert';
 
+import {assertLContainer} from './assert';
 import {NodeInjector, getParentInjectorLocation} from './di';
 import {addToViewTree, createEmbeddedViewAndNode, createLContainer, renderEmbeddedTemplate} from './instructions/shared';
 import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer, VIEW_REFS} from './interfaces/container';
 import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType, TViewNode} from './interfaces/node';
 import {RComment, RElement, isProceduralRenderer} from './interfaces/renderer';
-import {CONTEXT, LView, QUERIES, RENDERER, TView, T_HOST} from './interfaces/view';
+import {CONTEXT, DECLARATION_LCONTAINER, LView, QUERIES, RENDERER, TView, T_HOST} from './interfaces/view';
 import {assertNodeOfPossibleTypes} from './node_assert';
 import {addRemoveViewFromContainer, appendChild, detachView, getBeforeNodeForView, insertView, nativeInsertBefore, nativeNextSibling, nativeParentNode, removeView} from './node_manipulation';
 import {getParentInjectorTNode} from './node_util';
@@ -65,9 +66,8 @@ export function createElementRef(
 }
 
 let R3TemplateRef: {
-  new (
-      _declarationParentView: LView, elementRef: ViewEngine_ElementRef, _tView: TView,
-      _injectorIndex: number): ViewEngine_TemplateRef<any>
+  new (_declarationParentView: LView, hostTNode: TContainerNode, elementRef: ViewEngine_ElementRef):
+      ViewEngine_TemplateRef<any>
 };
 
 /**
@@ -98,25 +98,36 @@ export function createTemplateRef<T>(
     // TODO: Fix class name, should be TemplateRef, but there appears to be a rollup bug
     R3TemplateRef = class TemplateRef_<T> extends TemplateRefToken<T> {
       constructor(
-          private _declarationParentView: LView, readonly elementRef: ViewEngine_ElementRef,
-          private _tView: TView, private _injectorIndex: number) {
+          private _declarationView: LView, private _declarationTContainer: TContainerNode,
+          readonly elementRef: ViewEngine_ElementRef) {
         super();
       }
 
       createEmbeddedView(context: T, container?: LContainer, index?: number):
           viewEngine_EmbeddedViewRef<T> {
+        const embeddedTView = this._declarationTContainer.tViews as TView
         const lView = createEmbeddedViewAndNode(
-            this._tView, context, this._declarationParentView, this._injectorIndex);
+            embeddedTView, context, this._declarationView,
+            this._declarationTContainer.injectorIndex);
 
-        if (this._tView.tqueries !== null && this._declarationParentView[QUERIES] !== null) {
+        const declarationLContainer = this._declarationView[this._declarationTContainer.index];
+        ngDevMode && assertLContainer(declarationLContainer);
+
+        // TODO(pk): move this inside createEmbeddedViewAndNode function
+        lView[DECLARATION_LCONTAINER] = declarationLContainer;
+
+        // TODO(pk): why do we have the  this._declarationParentView[QUERIES] !== null check ?
+        // try to simplify or, at the very minimum, document!
+        if (embeddedTView.tqueries !== null && this._declarationView[QUERIES] !== null) {
           lView[QUERIES] =
-              this._declarationParentView[QUERIES] !.embeddedView(this._tView.tqueries);
+              this._declarationView[QUERIES] !.createEmbeddedView(embeddedTView.tqueries);
         }
 
         if (container) {
           insertView(lView, container, index !);
         }
-        renderEmbeddedTemplate(lView, this._tView, context);
+
+        renderEmbeddedTemplate(lView, embeddedTView, context);
         const viewRef = new ViewRef(lView, context, -1);
         viewRef._tViewNode = lView[T_HOST] as TViewNode;
         return viewRef;
@@ -127,8 +138,8 @@ export function createTemplateRef<T>(
   if (hostTNode.type === TNodeType.Container) {
     ngDevMode && assertDefined(hostTNode.tViews, 'TView must be allocated');
     return new R3TemplateRef(
-        hostView, createElementRef(ElementRefToken, hostTNode, hostView), hostTNode.tViews as TView,
-        hostTNode.injectorIndex);
+        hostView, hostTNode as TContainerNode,
+        createElementRef(ElementRefToken, hostTNode, hostView));
   } else {
     return null;
   }

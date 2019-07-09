@@ -9,7 +9,6 @@
 import {ViewRef} from '../../linker/view_ref';
 
 import {TNode} from './node';
-import {LQueries} from './query';
 import {RComment, RElement} from './renderer';
 import {StylingContext} from './styling';
 import {HOST, LView, NEXT, PARENT, QUERIES, T_HOST} from './view';
@@ -29,6 +28,9 @@ export const TYPE = 1;
 export const ACTIVE_INDEX = 2;
 // PARENT, NEXT, QUERIES and T_HOST are indices 3, 4, 5 and 6.
 // As we already have these constants in LView, we don't need to re-create them.
+
+export const PROJECTED_VIEWS = 5;
+
 export const NATIVE = 7;
 export const VIEW_REFS = 8;
 
@@ -87,9 +89,8 @@ export interface LContainer extends Array<any> {
    */
   [NEXT]: LView|LContainer|null;
 
-  // TODO(pk): remove as not needed any more - this will require change to the LView / LContainer
-  // shape
-  [QUERIES]: null;
+  // TODO(pk): document
+  [PROJECTED_VIEWS]: LView[]|null;
 
   /**
    * Pointer to the `TNode` which represents the host of the container.

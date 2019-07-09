@@ -348,6 +348,33 @@ describe('tquery logic', () => {
     });
   });
 
+  describe('views - declaration point different the insertion point', () => {
+
+    it('should report results from views inserted into a different container', () => {
+
+      @Component({
+        selector: 'test-cmpt',
+        template: `          
+          <ng-template #tpl>
+            <div #foo></div>
+          </ng-template>
+          <ng-template ngFor let-item [ngForOf]="items" [ngForTemplate]="tpl"></ng-template>
+          `
+      })
+      class TestCmpt {
+        items = [0];
+        @ViewChildren('foo') foos !: QueryList<ElementRef<any>>;
+      }
+
+      TestBed.configureTestingModule({declarations: [TestCmpt]});
+      const fixture = TestBed.createComponent(TestCmpt);
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.foos !.length).toBe(1);
+    });
+
+  });
+
   describe('descend', () => {
 
     it('should respect explicit descend flag', () => {
