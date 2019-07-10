@@ -72,15 +72,15 @@ export function ɵɵtemplate(
   if (tView.firstTemplatePass) {
     const embeddedTView = tContainerNode.tViews = createTView(
         -1, templateFn, consts, vars, tView.directiveRegistry, tView.pipeRegistry, null, null);
-    if (tView.tqueries !== null) {
-      embeddedTView.tqueries = tView.tqueries.embeddedTView(tContainerNode);
+    if (tView.queries !== null) {
+      embeddedTView.queries = tView.queries.embeddedTView(tContainerNode);
     }
   }
 
   createDirectivesAndLocals(tView, lView, localRefs, localRefExtractor);
 
-  if (tView.firstTemplatePass && tView.tqueries !== null) {
-    tView.tqueries.template(tView, tContainerNode)
+  if (tView.firstTemplatePass && tView.queries !== null) {
+    tView.queries.template(tView, tContainerNode)
   }
 
   attachPatchData(getNativeByTNode(tContainerNode, lView), lView);

@@ -324,8 +324,6 @@ export interface ExpandoInstructions extends Array<number|HostBindingsFunction<a
  * Stored on the `ComponentDef.tView`.
  */
 export interface TView {
-  tqueries: TQueries|null;
-
   /**
    * ID for inline views to determine whether a view is the same as the previous view
    * in a certain position. If it's not, we know the new view needs to be inserted
@@ -538,6 +536,11 @@ export interface TView {
    *
    */
   components: number[]|null;
+
+  /**
+   * A collection of queries tracked in a given view.
+   */
+  queries: TQueries|null;
 
   /**
    * A list of indices for child directives that have content queries.

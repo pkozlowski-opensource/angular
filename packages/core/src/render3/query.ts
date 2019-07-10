@@ -41,7 +41,7 @@ class LQueries2_ implements LQueries {
   constructor(public queries: LQuery<any>[] = []) {}
 
   createEmbeddedView(tView: TView): LQueries|null {
-    const tQueries = tView.tqueries;
+    const tQueries = tView.queries;
     if (tQueries !== null) {
       const firstContentQueryIndex = tView.contentQueries !== null ? tView.contentQueries[0] : 0;
       const noOfInheritedQueries = tQueries.length - firstContentQueryIndex;
@@ -334,7 +334,6 @@ function materializeViewResults<T>(lView: LView, tQuery: TQuery, queryIndex: num
   return lQuery.matches;
 }
 
-// TODO(pk): document, make it obvious that this is only for views hierarchy
 function collectQueryResults<T>(
     lView: LView, tQuery: TQuery, queryIndex: number, result: T[]): T[] {
   ngDevMode &&
@@ -539,8 +538,8 @@ function createLQuery<T>(lView: LView) {
 }
 
 function createTQuery(tView: TView, metadata: TQueryMetadata, nodeIndex: number): void {
-  if (tView.tqueries === null) tView.tqueries = new TQueries_();
-  tView.tqueries.track(new TQuery_(metadata, nodeIndex));
+  if (tView.queries === null) tView.queries = new TQueries_();
+  tView.queries.track(new TQuery_(metadata, nodeIndex));
 }
 
 function saveContentQueryAndDirectiveIndex(tView: TView, directiveIndex: number) {
@@ -548,11 +547,11 @@ function saveContentQueryAndDirectiveIndex(tView: TView, directiveIndex: number)
   const lastSavedDirectiveIndex =
       tView.contentQueries.length ? tViewContentQueries[tViewContentQueries.length - 1] : -1;
   if (directiveIndex !== lastSavedDirectiveIndex) {
-    tViewContentQueries.push(tView.tqueries !.length - 1, directiveIndex);
+    tViewContentQueries.push(tView.queries !.length - 1, directiveIndex);
   }
 }
 
 function getTQuery(tView: TView, index: number): TQuery {
-  ngDevMode && assertDefined(tView.tqueries, 'TQueries must be defined to retrieve a TQuery');
-  return tView.tqueries !.getByIndex(index);
+  ngDevMode && assertDefined(tView.queries, 'TQueries must be defined to retrieve a TQuery');
+  return tView.queries !.getByIndex(index);
 }

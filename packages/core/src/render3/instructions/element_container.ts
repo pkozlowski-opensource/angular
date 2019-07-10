@@ -20,7 +20,6 @@ import {isContentQueryHost} from '../util/view_utils';
 import {createDirectivesAndLocals, executeContentQueries, getOrCreateTNode, setNodeStylingTemplate} from './shared';
 
 
-
 /**
  * Creates a logical container for other nodes (<ng-container>) backed by a comment node in the DOM.
  * The instruction must later be followed by `elementContainerEnd()` call.
@@ -63,12 +62,11 @@ export function ɵɵelementContainerStart(
   appendChild(native, tNode, lView);
   createDirectivesAndLocals(tView, lView, localRefs);
 
-  if (tView.firstTemplatePass && tView.tqueries !== null) {
-    tView.tqueries.elementStart(tView, tNode);
+  if (tView.firstTemplatePass && tView.queries !== null) {
+    tView.queries.elementStart(tView, tNode);
   }
 
   attachPatchData(native, lView);
-
   executeContentQueries(tView, tNode, lView);
 }
 
@@ -97,9 +95,9 @@ export function ɵɵelementContainerEnd(): void {
 
   registerPostOrderHooks(tView, previousOrParentTNode);
 
-  if (tView.firstTemplatePass && tView.tqueries !== null &&
+  if (tView.firstTemplatePass && tView.queries !== null &&
       isContentQueryHost(previousOrParentTNode)) {
-    tView.tqueries.elementEnd(previousOrParentTNode);
+    tView.queries.elementEnd(previousOrParentTNode);
   }
 }
 

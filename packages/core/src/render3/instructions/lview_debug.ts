@@ -73,7 +73,7 @@ export function cloneToLView(list: any[]): LView {
  */
 export const TViewConstructor = class TView implements ITView {
   constructor(
-      public tqueries: TQueries|null,
+      public queries: TQueries|null,
       public id: number,                                     //
       public blueprint: LView,                               //
       public template: ComponentTemplate<{}>|null,           //

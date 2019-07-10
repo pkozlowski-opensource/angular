@@ -108,8 +108,8 @@ export function ɵɵelementStart(
       tNode.flags |= TNodeFlags.hasStyleInput;
     }
 
-    if (tView.tqueries !== null) {
-      tView.tqueries.elementStart(tView, tNode);
+    if (tView.queries !== null) {
+      tView.queries.elementStart(tView, tNode);
     }
   }
 
@@ -154,9 +154,9 @@ export function ɵɵelementEnd(): void {
   registerPostOrderHooks(tView, previousOrParentTNode);
   decreaseElementDepthCount();
 
-  if (tView.firstTemplatePass && tView.tqueries !== null &&
+  if (tView.firstTemplatePass && tView.queries !== null &&
       isContentQueryHost(previousOrParentTNode)) {
-    tView.tqueries !.elementEnd(previousOrParentTNode);
+    tView.queries !.elementEnd(previousOrParentTNode);
   }
 
   // this is fired at the end of elementEnd because ALL of the stylingBindings code
