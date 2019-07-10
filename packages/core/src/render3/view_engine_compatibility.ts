@@ -112,15 +112,11 @@ export function createTemplateRef<T>(
 
         const declarationLContainer = this._declarationView[this._declarationTContainer.index];
         ngDevMode && assertLContainer(declarationLContainer);
-
-        // TODO(pk): move this inside createEmbeddedViewAndNode function
         lView[DECLARATION_LCONTAINER] = declarationLContainer;
 
-        // TODO(pk): why do we have the  this._declarationParentView[QUERIES] !== null check ?
-        // try to simplify or, at the very minimum, document!
-        if (embeddedTView.tqueries !== null && this._declarationView[QUERIES] !== null) {
-          lView[QUERIES] =
-              this._declarationView[QUERIES] !.createEmbeddedView(embeddedTView.tqueries);
+        const declarationViewLQueries = this._declarationView[QUERIES];
+        if (declarationViewLQueries !== null) {
+          lView[QUERIES] = declarationViewLQueries.createEmbeddedView(embeddedTView);
         }
 
         if (container) {

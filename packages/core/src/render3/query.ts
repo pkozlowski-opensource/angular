@@ -32,7 +32,6 @@ const unusedValueToPlacateAjd = unused1 + unused2 + unused3 + unused4;
 
 class LQuery2_<T> implements LQuery<T> {
   matches: T|null[]|null = null;
-  // PERF(pk): we shouldn't need queryList here, it boils down to instructions setup
   constructor(public queryList: QueryList<T>) {}
   clone(): LQuery<T> { return new LQuery2_(this.queryList); }
   setDirty(): void { this.queryList.setDirty(); }
@@ -41,32 +40,38 @@ class LQuery2_<T> implements LQuery<T> {
 class LQueries2_ implements LQueries {
   constructor(public queries: LQuery<any>[] = []) {}
 
-  createEmbeddedView(tQueries: TQueries): LQueries {
-    const viewLQueries: LQuery<any>[] = new Array(tQueries.length);
+  createEmbeddedView(tView: TView): LQueries|null {
+    const tQueries = tView.tqueries;
+    if (tQueries !== null) {
+      const firstContentQueryIndex = tView.contentQueries !== null ? tView.contentQueries[0] : 0;
+      const noOfInheritedQueries = tQueries.length - firstContentQueryIndex;
+      const viewLQueries: LQuery<any>[] = new Array(noOfInheritedQueries);
 
-    for (let i = 0; i < tQueries.length; i++) {
-      const tQuery = tQueries.getByIndex(i);
-      if (tQuery.parentQueryIndex !== -1) {
-        const parentLQuery = this.queries ![tQuery.parentQueryIndex];
+      // An embedded view has queries propagated from a declaration view at the beginning of the
+      // TQueries collection and up until a first content query declared in the embedded view. Only
+      // propagated LQueries are created at this point (LQuery corresponding to declared content
+      // queries will be instantiated from the content query instructions for each directive).
+      for (let i = 0; i < noOfInheritedQueries; i++) {
+        const tQuery = tQueries.getByIndex(i);
+        const parentLQuery = this.queries ![tQuery.indexInDeclarationView];
         viewLQueries[i] = parentLQuery.clone();
-      } else {
-        // TODO(pk): why do we have it here? How would I document it?
-        break;
       }
+
+      return new LQueries2_(viewLQueries);
     }
 
-    return new LQueries2_(viewLQueries);
+    return null;
   }
 
   insertView(tView: TView): void { this.dirtyQueriesWithMatches(tView); }
 
-  removeView(tView: TView): void { this.dirtyQueriesWithMatches(tView); }
+  detachView(tView: TView): void { this.dirtyQueriesWithMatches(tView); }
 
   private dirtyQueriesWithMatches(tView: TView) {
     for (let i = 0; i < this.queries.length; i++) {
       const tQuery = getTQuery(tView, i);
       // TODO(pk): firstTemplatePass check is here since the view insertion happens before a
-      // template is processed I think that this is another bug that I should fix via
+      // template is processed. I (pk) think that this is a bug that I should fix via
       // https://github.com/angular/angular/pull/31312 - remove this check when the mentioned PR
       // lands
       if (tQuery.matches !== null || tView.firstTemplatePass) {
@@ -110,11 +115,11 @@ class TQueries_ implements TQueries {
 
     for (let i = 0; i < this.queries.length; i++) {
       const tquery = this.queries[i];
-      const tqueryClone = tquery.embeddedTView(
-          tNode, queriesForTemplateRef !== null ? queriesForTemplateRef.length : 0);
+      const childQueryIndex = queriesForTemplateRef !== null ? queriesForTemplateRef.length : 0;
+      const tqueryClone = tquery.embeddedTView(tNode, childQueryIndex);
 
       if (tqueryClone) {
-        tqueryClone.parentQueryIndex = i;
+        tqueryClone.indexInDeclarationView = i;
         if (queriesForTemplateRef !== null) {
           queriesForTemplateRef.push(tqueryClone);
         } else {
@@ -143,21 +148,19 @@ class TQueries_ implements TQueries {
 }
 
 class TQuery_ implements TQuery {
-  parentQueryIndex = -1;
   matches: number[]|null = null;
-  matchesTemplateDeclaration = false;
+  indexInDeclarationView = -1;
+  matchesNgTemplate = false;
 
   /**
    * A node index on which a query was declared (-1 for view queries and ones inherited from the
    * declaration template). We use this index (alongside with _appliesToNextNode flag) to know
-   * when
-   * to apply content queries to elements in a template.
+   * when to apply content queries to elements in a template.
    */
   private _declarationNodeIndex: number;
 
   /**
-   * A flag indicating if a given still applies to nodes it is crossing. We use this flag
-   * (alongside
+   * A flag indicating if a given still applies to nodes it is crossing. We use this flag (alongside
    * with _declarationNodeIndex) to know when to stop applying content queries to elements in a
    * template.
    */
@@ -169,7 +172,10 @@ class TQuery_ implements TQuery {
 
   elementStart(tView: TView, tNode: TNode): void {
     if (this.isApplyingToNode(tNode)) {
-      this.addMatch(tNode.index, this.getMatchIndex(tView, tNode));
+      const matchIndex = this.getMatchIndex(tView, tNode);
+      if (matchIndex !== null) {
+        this.addMatch(tNode.index, matchIndex);
+      }
     }
   }
 
@@ -181,15 +187,18 @@ class TQuery_ implements TQuery {
 
   template(tView: TView, tNode: TNode): void {
     if (this.isApplyingToNode(tNode)) {
-      this.addMatchOTemplate(tNode.index, this.getMatchIndex(tView, tNode));
+      const matchIndex = this.getMatchIndex(tView, tNode);
+      if (matchIndex !== null) {
+        this.addTemplateMatch(tNode.index, matchIndex);
+      }
     }
   }
 
   embeddedTView(tNode: TNode, childQueryIndex: number): TQuery|null {
     if (this.isApplyingToNode(tNode)) {
-      this.matchesTemplateDeclaration = true;
-      // add a marker denoting a TemplateRef that can be used to stamp embedded views with query
-      // results
+      this.matchesNgTemplate = true;
+      // A marker indicating a `<ng-template>` element (a placeholder for query results from
+      // embedded views created based on this `<ng-template>`).
       this.addMatch(-tNode.index, childQueryIndex);
       return new TQuery_(this.metadata);
     }
@@ -227,18 +236,24 @@ class TQuery_ implements TQuery {
     return matchIdx;
   }
 
-  private addMatch(tNodeIdx: number, matchIdx: number|null) {
-    if (matchIdx !== null) {
-      if (this.matches === null) this.matches = [];
+  private addMatch(tNodeIdx: number, matchIdx: number) {
+    if (this.matches === null) {
+      this.matches = [tNodeIdx, matchIdx];
+    } else {
       this.matches.push(tNodeIdx, matchIdx);
     }
   }
 
-  private addMatchOTemplate(tNodeIdx: number, matchIdx: number|null) {
-    // TODO(pk): assert on this.matches being defined and length >=2
-    if (matchIdx !== null) {
-      this.matches !.splice(this.matches !.length - 2, 0, tNodeIdx, matchIdx);
-    }
+  private addTemplateMatch(tNodeIdx: number, matchIdx: number) {
+    const tQueryMatches = this.matches !;
+    ngDevMode &&
+        assertDefined(
+            tQueryMatches,
+            'Query matches should have at least ng-template marker when adding a match on a template.');
+
+    const matchInsertionIndex = tQueryMatches.length - 2;
+    ngDevMode && assertDataInRange(tQueryMatches, matchInsertionIndex);
+    this.matches !.splice(matchInsertionIndex, 0, tNodeIdx, matchIdx);
   }
 }
 
@@ -300,7 +315,6 @@ function materializeViewResults<T>(lView: LView, tQuery: TQuery, queryIndex: num
   const lQuery = lView[QUERIES] !.queries ![queryIndex];
   if (lQuery.matches === null) {
     const tView = lView[TVIEW];
-    // TODO(pk): assert that tQueryMatches is not null
     const tQueryMatches = tQuery.matches !;
     const result: T|null[] = new Array(tQueryMatches.length / 2);
     for (let i = 0; i < tQueryMatches.length; i += 2) {
@@ -308,7 +322,7 @@ function materializeViewResults<T>(lView: LView, tQuery: TQuery, queryIndex: num
       if (matchedNodeIdx < 0) {
         result[i / 2] = null;
       } else {
-        // TODO(pk): assert on index and TNode or use an existing utility function
+        ngDevMode && assertDataInRange(tView.data, matchedNodeIdx);
         const tNode = tView.data[matchedNodeIdx] as TNode;
         result[i / 2] =
             createResultForNode(lView, tNode, tQueryMatches[i + 1], tQuery.metadata.read);
@@ -344,7 +358,6 @@ function collectQueryResults<T>(
 
       for (let i = CONTAINER_HEADER_OFFSET; i < declarationLContainer.length; i++) {
         const embeddedLView = declarationLContainer[i];
-        // TODO(pk): extract condition in this if statement into a utility function
         if (embeddedLView[DECLARATION_LCONTAINER] === embeddedLView[PARENT]) {
           const embeddedTView = embeddedLView[TVIEW];
           const tquery = getTQuery(embeddedTView, childQueryIndex);
@@ -388,7 +401,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
   if (queryList.dirty && (isCreationMode() === tQuery.metadata.isStatic)) {
     if (tQuery.matches === null) {
       queryList.reset([]);
-    } else if (!tQuery.matchesTemplateDeclaration) {
+    } else if (!tQuery.matchesNgTemplate) {
       queryList.reset(materializeViewResults(lView, tQuery, queryIndex));
     } else {
       queryList.reset(collectQueryResults(lView, tQuery, queryIndex, []));
@@ -513,15 +526,12 @@ export function ɵɵloadContentQuery<T>(): QueryList<T> {
 function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
   ngDevMode &&
       assertDefined(lView[QUERIES], 'LQueries should be defined when trying to load a query');
-  // TODO(pk): create a getter on LQueries and a utility method
   ngDevMode && assertDataInRange(lView[QUERIES] !.queries, queryIndex);
   return lView[QUERIES] !.queries[queryIndex].queryList;
 }
 
 function createLQuery<T>(lView: LView) {
   const queryList = new QueryList<T>();
-
-  // TODO(pk): this is only need if we return QueryList, we shouldn't be doing it for single element
   storeCleanupWithContext(lView, queryList, queryList.destroy);
 
   if (lView[QUERIES] === null) lView[QUERIES] = new LQueries2_();

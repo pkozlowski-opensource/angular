@@ -12,6 +12,9 @@ import {QueryList} from '../../linker';
 import {TNode} from './node';
 import {TView} from './view';
 
+/**
+ * An object representing query metadata extracted from query annotations.
+ */
 export interface TQueryMetadata {
   predicate: Type<any>|string[];
   descendants: boolean;
@@ -19,54 +22,194 @@ export interface TQueryMetadata {
   isStatic: boolean
 }
 
+/**
+ * TQuery objects represent all the query-related data that remain the same from one view instance
+ * to another and can be determined on the very first template pass. Most notably TQuery holds all
+ * the matches for a given view.
+ */
 export interface TQuery {
   /**
    * Query metadata extracted from query annotations.
    */
   metadata: TQueryMetadata;
 
-  parentQueryIndex: number;
+  /**
+   * Index of a query in a declaration view in case of queries propagated to en embedded view, -1
+   * for queries declared in a given view.
+   */
+  indexInDeclarationView: number;
 
   /**
    * Matches collected on the the first template pass. Each match is a pair of:
-   * - TNode index
-   * - match index (injectable index or -1 for the default read)
+   * - TNode index;
+   * - match index;
+   *
+   * A TNode index can be either:
+   * - a positive number (most common case) to indicate a matching TNode;
+   * - a negative number to indicate that a given query is matching a <ng-template> element and
+   * results from views created based on TemplateRef should be inserted at this place.
+   *
+   * A match index is a number used to find an actual value (for a given node) when query results
+   * are materialized. This index can have one of the following values:
+   * - -2 - indicates that we need to read a special token (TemplateRef, ViewContainerRef etc.);
+   * - -1 - indicates that we need to read a default value based on the node type (TemplateRef for
+   * ng-template and ElementRef for other elements);
+   * - a positive number - index of an injectable to be read from the element injector.
    */
   matches: number[]|null;
 
-  // TODO(pk): document
-  matchesTemplateDeclaration: boolean;
+  /**
+   * A flag indicating if a given crosses a <ng-template> element. This flag exists for performance
+   * reasons: we can notice that queries not crossing any <ng-template> elements will have matches
+   * from a given view only (and adapt processing accordingly).
+   */
+  matchesNgTemplate: boolean;
 
+  /**
+   * A method call when a given query is crossing an element (or element container). This is where a
+   * given TNode is matched against a query predicate.
+   * @param tView
+   * @param tNode
+   */
   elementStart(tView: TView, tNode: TNode): void;
+
+  /**
+   * A method called when processing the elementEnd instruction - this is mostly useful to determine
+   * if a given content query should match any nodes past this point.
+   * @param tNode
+   */
   elementEnd(tNode: TNode): void;
+
+  /**
+   * A method called when processing the template instruction. This is where a
+   * given TContainerNode is matched against a query predicate.
+   * @param tView
+   * @param tNode
+   */
   template(tView: TView, tNode: TNode): void;
+
+  /**
+   * A query-related method called when an embedded TView is created based on the content of a
+   * <ng-template> element. We call this method to determine if a given query should be propagated
+   * to the embedded view and if so - clone a TQuery for this embedded view.
+   * @param tNode
+   * @param childQueryIndex
+   */
   embeddedTView(tNode: TNode, childQueryIndex: number): TQuery|null;
 }
 
+/**
+ * TQueries represent a collection of individual TQuery objects tracked in a given view. Most of the
+ * methods on this interface are simple proxy methods to the corresponding functionality on TQuery.
+ */
 export interface TQueries {
-  elementStart(tView: TView, tNode: TNode): void;
-  elementEnd(tNode: TNode): void;
-  template(tView: TView, tNode: TNode): void;
-  embeddedTView(tNode: TNode): TQueries|null;
-  getByIndex(index: number): TQuery;
+  /**
+   * Adds a new TQuery to a collection of queries tracked in a given view.
+   * @param tQuery
+   */
   track(tQuery: TQuery): void;
+
+  /**
+   * Returns a TQuery instance for a given index.
+   * @param index
+   */
+  getByIndex(index: number): TQuery;
+
+  /**
+   * Returns a number of queries tracked in a given view.
+   */
   length: number;
+
+  /**
+   * A proxy method that iterates over all the TQueries in a given TView and calls the corresponding
+   * `elementStart` on each and every TQuery.
+   * @param tView
+   * @param tNode
+   */
+  elementStart(tView: TView, tNode: TNode): void;
+
+  /**
+   * A proxy method that iterates over all the TQueries in a given TView and calls the corresponding
+   * `elementEnd` on each and every TQuery.
+   * @param tNode
+   */
+  elementEnd(tNode: TNode): void;
+
+  /**
+   * A proxy method that iterates over all the TQueries in a given TView and calls the corresponding
+   * `template` on each and every TQuery.
+   * @param tView
+   * @param tNode
+   */
+  template(tView: TView, tNode: TNode): void;
+
+  /**
+  * A proxy method that iterates over all the TQueries in a given TView and calls the corresponding
+   * `embeddedTView` on each and every TQuery.
+   * @param tNode
+   */
+  embeddedTView(tNode: TNode): TQueries|null;
 }
 
+/**
+ * An interface that represents query-related information specific to a view instance. Most notably
+ * it contains:
+ * - materialized query matches;
+ * - a pointer to a QueryList where materialized query results should be reported.
+ */
 export interface LQuery<T> {
+  /**
+   * Materialized query matches for a given view only (!). Results are initialized lazilly so the
+   * array of matches is set to `null` initially.
+   */
   matches: T|null[]|null;
-  // TODO(pk): remove from the interface, introduce abstraction over storage (setDirty, first)
-  // instead
+
+  /**
+   * A QueryList where materialized query results should be reported.
+   */
   queryList: QueryList<T>;
+
+  /**
+   * Clones a LQuery for an embedded view. A cloned query shares the same `QueryList` but has a
+   * separate collection of materialized matches.
+   */
   clone(): LQuery<T>;
+
+  /**
+   * Called when an embedded view, impacting results of this query, is inserted or removed.
+   */
   setDirty(): void;
 }
 
+/**
+ * lQueries represent a collection of individual LQuery objects tracked in a given view.
+ */
 export interface LQueries {
+  /**
+   * A collection of queries tracked in a given view.
+   */
   queries: LQuery<any>[];
-  createEmbeddedView(tQueries: TQueries): LQueries;
+
+  /**
+   * A method called when a new embedded view is created. As a result a set of LQueries applicable
+   * for a new embedded view is instantiated (cloned) from the declaration view.
+   * @param tView
+   */
+  createEmbeddedView(tView: TView): LQueries|null;
+
+  /**
+   * A method called when an embedded view is inserted into a container. As a result all impacted
+   * `LQuery` objects (and associated `QueryList`) are marked as dirty.
+   * @param tView
+   */
   insertView(tView: TView): void;
-  removeView(tView: TView): void;
+
+  /**
+   * A method called when an embedded view is detached from a container. As a result all impacted
+   * `LQuery` objects (and associated `QueryList`) are marked as dirty.
+   * @param tView
+   */
+  detachView(tView: TView): void;
 }
 
 

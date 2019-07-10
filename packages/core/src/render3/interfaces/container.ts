@@ -89,7 +89,11 @@ export interface LContainer extends Array<any> {
    */
   [NEXT]: LView|LContainer|null;
 
-  // TODO(pk): document
+  /**
+   * A collection of views created based on the underlying `<ng-template>` element but inserted into
+   * a different `LContainer`. We need to track views created from a given declaration point since
+   * queries collect matches from the embedded view declaration point and _not_ the insertion point.
+   */
   [PROJECTED_VIEWS]: LView[]|null;
 
   /**

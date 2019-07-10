@@ -235,7 +235,7 @@ export function insertView(lView: LView, lContainer: LContainer, index: number) 
 
 /**
  * Track views created from the declaration container (TemplateRef) and inserted into a
- * ViewContainerRef on a different node.
+ * different LContainer.
  */
 function trackProjectedView(declarationContainer: LContainer, lView: LView) {
   ngDevMode && assertLContainer(declarationContainer);
@@ -249,10 +249,12 @@ function trackProjectedView(declarationContainer: LContainer, lView: LView) {
 
 function detachProjectedView(declarationContainer: LContainer, lView: LView) {
   ngDevMode && assertLContainer(declarationContainer);
-  // TODO(pk): assert on !
-  const declaredViews = declarationContainer[PROJECTED_VIEWS] !;
-  const declaredViewIndex = declaredViews.indexOf(lView);
-  declaredViews.splice(declaredViewIndex, 1);
+  ngDevMode && assertDefined(
+                   declarationContainer[PROJECTED_VIEWS],
+                   'A projected view should belong to a non-empty projected views collection');
+  const projectedViews = declarationContainer[PROJECTED_VIEWS] !;
+  const declaredViewIndex = projectedViews.indexOf(lView);
+  projectedViews.splice(declaredViewIndex, 1);
 }
 
 /**
@@ -390,7 +392,7 @@ function cleanUpView(view: LView | LContainer): void {
 
       // For embedded views still attached to a container: remove query result from this view.
       if (view[QUERIES] !== null) {
-        view[QUERIES] !.removeView(view[TVIEW]);
+        view[QUERIES] !.detachView(view[TVIEW]);
       }
     }
   }

@@ -10,7 +10,7 @@ import {ComponentTemplate} from '..';
 import {SchemaMetadata} from '../../core';
 import {assertDefined} from '../../util/assert';
 import {createNamedArrayType} from '../../util/named_array_type';
-import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer, NATIVE} from '../interfaces/container';
+import {ACTIVE_INDEX, CONTAINER_HEADER_OFFSET, LContainer, NATIVE, PROJECTED_VIEWS} from '../interfaces/container';
 import {DirectiveDefList, PipeDefList, ViewQueriesFunction} from '../interfaces/definition';
 import {COMMENT_MARKER, ELEMENT_MARKER, I18nMutateOpCode, I18nMutateOpCodes, I18nUpdateOpCode, I18nUpdateOpCodes, TIcu} from '../interfaces/i18n';
 import {TElementNode, TNode, TViewNode} from '../interfaces/node';
@@ -299,8 +299,7 @@ export class LContainerDebug {
         .map(toDebug as(l: LView) => LViewDebug);
   }
   get parent(): LViewDebug|LContainerDebug|null { return toDebug(this._raw_lContainer[PARENT]); }
-  // TODO(pk): this doesn't hold queries any more (!)
-  get queries(): LView[]|null { return this._raw_lContainer[QUERIES]; }
+  get projectedViews(): LView[]|null { return this._raw_lContainer[PROJECTED_VIEWS]; }
   get host(): RElement|RComment|StylingContext|LView { return this._raw_lContainer[HOST]; }
   get native(): RComment { return this._raw_lContainer[NATIVE]; }
   get __other__() {
