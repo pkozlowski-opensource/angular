@@ -1486,7 +1486,7 @@ export function createLContainer(
  * them
  * by executing an associated template function.
  */
-function refreshDynamicEmbeddedViews(lView: LView) {
+export function refreshDynamicEmbeddedViews(lView: LView) {
   let viewOrContainer = lView[CHILD_HEAD];
   while (viewOrContainer !== null) {
     // Note: viewOrContainer can be an LView or an LContainer instance, but here we are only
