@@ -134,6 +134,7 @@ export function renderComponent<T>(
       opts.injector || null);
   const hostTNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Element, null, null);
   rootView[HEADER_OFFSET] = hostRNode;
+  queueComponentIndexForCheck(rootTView, hostTNode);
 
   const oldView = enterView(rootView, null);
   let component: T;
@@ -189,7 +190,6 @@ export function createRootComponentView(
     diPublicInInjector(getOrCreateNodeInjectorForNode(hostTNode, rootView), tView, def.type);
     hostTNode.flags = TNodeFlags.isComponent;
     initNodeFlags(hostTNode, rootView.length, 1);
-    queueComponentIndexForCheck(tView, hostTNode);
   }
 
   // Store component view at node index, with node as the HOST

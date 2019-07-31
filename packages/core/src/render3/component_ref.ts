@@ -24,7 +24,7 @@ import {assertComponentType} from './assert';
 import {LifecycleHooksFeature, createRootComponent, createRootComponentView, createRootContext} from './component';
 import {getComponentDef} from './definition';
 import {NodeInjector} from './di';
-import {addToViewTree, assignTViewNodeToLView, createLView, createTView, elementCreate, getOrCreateTNode, initNodeFlags, locateHostElement, refreshDescendantViews} from './instructions/shared';
+import {addToViewTree, assignTViewNodeToLView, createLView, createTView, elementCreate, getOrCreateTNode, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef} from './interfaces/definition';
 import {TContainerNode, TElementContainerNode, TElementNode, TNodeFlags, TNodeType} from './interfaces/node';
 import {RNode, RendererFactory3, domRendererFactory3, isProceduralRenderer} from './interfaces/renderer';
@@ -171,6 +171,7 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
         null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
         rootViewInjector);
     rootLView[HEADER_OFFSET] = hostRNode;
+    queueComponentIndexForCheck(rootTView, hostTNode);
 
     // rootView is the parent when bootstrapping
     const oldLView = enterView(rootLView, null);
