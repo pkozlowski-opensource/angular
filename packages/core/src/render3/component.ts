@@ -16,7 +16,7 @@ import {assertComponentType} from './assert';
 import {getComponentDef} from './definition';
 import {diPublicInInjector, getOrCreateNodeInjectorForNode} from './di';
 import {registerPostOrderHooks, registerPreOrderHooks} from './hooks';
-import {CLEAN_PROMISE, addToViewTree, createComponentView, createLView, createTView, getOrCreateTNode, getOrCreateTView, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
+import {CLEAN_PROMISE, createComponentView, createLView, createTView, getOrCreateTNode, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef, ComponentType, RenderFlags} from './interfaces/definition';
 import {TElementNode, TNode, TNodeFlags, TNodeType} from './interfaces/node';
 import {PlayerHandler} from './interfaces/player';
@@ -130,7 +130,7 @@ export function renderComponent<T>(
   const renderer = rendererFactory.createRenderer(hostRNode, componentDef);
   const rootTView = createTView(-1, null, 1, 0, null, null, null, null);
   const rootView: LView = createLView(
-      null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, undefined,
+      null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
       opts.injector || null);
   const hostTNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Element, null, null);
   rootView[HEADER_OFFSET] = hostRNode;
@@ -145,13 +145,19 @@ export function renderComponent<T>(
     if (rendererFactory.begin) rendererFactory.begin();
     resetComponentState();
     setPreviousOrParentTNode(hostTNode, true);
-    const componentView = createRootComponentView(
-        hostTNode, componentDef, rootView, rendererFactory, renderer, sanitizer);
+
+    // TODO(pk): this should be done earlier on
+    const componentView = createComponentView(rootView, hostTNode, componentDef, renderer);
+
+    // TODO(pk): this should be part of the common / shared code
+    diPublicInInjector(
+        getOrCreateNodeInjectorForNode(hostTNode, rootView), rootTView, componentDef.type);
+    hostTNode.flags = TNodeFlags.isComponent;
+    initNodeFlags(hostTNode, rootView.length, 1);
+
+
     component = createRootComponent(
         componentView, componentDef, rootView, rootContext, opts.hostFeatures || null, hostTNode);
-
-    // TODO(pk): I will be able to get rid of this, yey!
-    addToViewTree(rootView, componentView);
 
     refreshDescendantViews(rootView);  // creation mode pass
     rootView[FLAGS] &= ~LViewFlags.CreationMode;
@@ -164,37 +170,6 @@ export function renderComponent<T>(
   }
 
   return component;
-}
-
-/**
- * Creates the root component view and the root component node.
- *
- * @param rNode Render host element.
- * @param def ComponentDef
- * @param rootView The parent view where the host node is stored
- * @param renderer The current renderer
- * @param sanitizer The sanitizer, if provided
- *
- * @returns Component view created
- */
-export function createRootComponentView(
-    hostTNode: TElementNode, def: ComponentDef<any>, rootView: LView,
-    rendererFactory: RendererFactory3, renderer: Renderer3, sanitizer?: Sanitizer | null): LView {
-  const tView = rootView[TVIEW];
-  const nativeRNode = getNativeByTNode(hostTNode, rootView) as RElement;
-  const componentView = createLView(
-      rootView, getOrCreateTView(def), null, def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways,
-      nativeRNode, hostTNode, rendererFactory, renderer, sanitizer);
-
-  if (tView.firstTemplatePass) {
-    diPublicInInjector(getOrCreateNodeInjectorForNode(hostTNode, rootView), tView, def.type);
-    hostTNode.flags = TNodeFlags.isComponent;
-    initNodeFlags(hostTNode, rootView.length, 1);
-  }
-
-  // Store component view at node index, with node as the HOST
-  // TODO(pk): get it from TNode index
-  return rootView[hostTNode.index] = componentView;
 }
 
 /**

@@ -21,10 +21,10 @@ import {VERSION} from '../version';
 import {NOT_FOUND_CHECK_ONLY_ELEMENT_INJECTOR} from '../view/provider';
 
 import {assertComponentType} from './assert';
-import {LifecycleHooksFeature, createRootComponent, createRootComponentView, createRootContext} from './component';
+import {LifecycleHooksFeature, createRootComponent, createRootContext} from './component';
 import {getComponentDef} from './definition';
-import {NodeInjector} from './di';
-import {addToViewTree, assignTViewNodeToLView, createLView, createTView, elementCreate, getOrCreateTNode, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
+import {NodeInjector, diPublicInInjector, getOrCreateNodeInjectorForNode} from './di';
+import {assignTViewNodeToLView, createComponentView, createLView, createTView, elementCreate, getOrCreateTNode, initNodeFlags, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef} from './interfaces/definition';
 import {TContainerNode, TElementContainerNode, TElementNode, TNodeFlags, TNodeType} from './interfaces/node';
 import {RNode, RendererFactory3, domRendererFactory3, isProceduralRenderer} from './interfaces/renderer';
@@ -183,8 +183,13 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
     try {
       resetComponentState();
       setPreviousOrParentTNode(hostTNode, true);
-      const componentView = createRootComponentView(
-          hostTNode, this.componentDef, rootLView, rendererFactory, renderer);
+      const componentView = createComponentView(rootLView, hostTNode, this.componentDef, renderer);
+
+      // TODO(pk): this should be part of the common / shared code
+      diPublicInInjector(
+          getOrCreateNodeInjectorForNode(hostTNode, rootLView), rootTView, this.componentType);
+      hostTNode.flags = TNodeFlags.isComponent;
+      initNodeFlags(hostTNode, rootLView.length, 1);
 
       if (projectableNodes) {
         // projectable nodes can be passed as array of arrays or an array of iterables (ngUpgrade
@@ -201,8 +206,6 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
           componentView, this.componentDef, rootLView, rootContext, [LifecycleHooksFeature],
           hostTNode);
 
-      // TODO(pk): I will be able to get rid of it
-      addToViewTree(rootLView, componentView);
       refreshDescendantViews(rootLView);
       safeToRunHooks = true;
     } finally {

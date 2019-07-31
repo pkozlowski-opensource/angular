@@ -1309,15 +1309,17 @@ function baseResolveDirective<T>(
 
 // TODO(pk): document
 export function createComponentView<T>(
-    lView: LView, hostTNode: TElementNode, def: ComponentDef<T>): LView {
-  const nativeRNode = getNativeByTNode(hostTNode, lView) as RElement;
-  const componentTView = getOrCreateTView(def);
-
+    lView: LView, hostTNode: TElementNode, def: ComponentDef<T>, renderer?: Renderer3): LView {
   const rendererFactory = lView[RENDERER_FACTORY];
-  const renderer = rendererFactory.createRenderer(nativeRNode as RElement, def);
+  const nativeRNode = getNativeByTNode(hostTNode, lView) as RElement;
+  const componentRenderer = renderer === undefined ?
+      rendererFactory.createRenderer(nativeRNode as RElement, def) :
+      renderer;
+
+  const componentTView = getOrCreateTView(def);
   const componentView = createLView(
       lView, componentTView, null, def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways,
-      nativeRNode, hostTNode, rendererFactory, renderer);
+      nativeRNode, hostTNode, lView[RENDERER_FACTORY], componentRenderer);
 
   // Only component views should be added to the view tree directly. Embedded views are
   // accessed through their containers because they may be removed / re-added later.
