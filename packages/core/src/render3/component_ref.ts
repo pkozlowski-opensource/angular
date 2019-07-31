@@ -24,14 +24,13 @@ import {assertComponentType} from './assert';
 import {LifecycleHooksFeature, createRootComponent, createRootComponentView, createRootContext} from './component';
 import {getComponentDef} from './definition';
 import {NodeInjector} from './di';
-import {addToViewTree, assignTViewNodeToLView, createLView, createTView, elementCreate, locateHostElement, refreshDescendantViews} from './instructions/shared';
+import {addToViewTree, assignTViewNodeToLView, createLView, createTView, elementCreate, getOrCreateTNode, initNodeFlags, locateHostElement, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef} from './interfaces/definition';
-import {TContainerNode, TElementContainerNode, TElementNode} from './interfaces/node';
+import {TContainerNode, TElementContainerNode, TElementNode, TNodeFlags, TNodeType} from './interfaces/node';
 import {RNode, RendererFactory3, domRendererFactory3, isProceduralRenderer} from './interfaces/renderer';
-import {LView, LViewFlags, TVIEW} from './interfaces/view';
-import {enterView, leaveView, namespaceHTMLInternal} from './state';
+import {HEADER_OFFSET, LView, LViewFlags, TVIEW} from './interfaces/view';
+import {enterView, leaveView, namespaceHTMLInternal, resetComponentState, setPreviousOrParentTNode} from './state';
 import {defaultScheduler} from './util/misc_utils';
-import {getTNode} from './util/view_utils';
 import {createElementRef} from './view_engine_compatibility';
 import {RootViewRef, ViewRef} from './view_ref';
 
@@ -161,29 +160,36 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
     }
 
     // Create the root view. Uses empty TView and ContentTemplate.
+    // TODO(pk): extract it to a separate function as this is used in both bootstrap and dynamic
+    // component creation
+    const rootTView = createTView(-1, null, 1, 0, null, null, null, null);
+
+    // TODO(pk): I could just create TNode here as it will never exist (!)
+    const hostTNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Element, null, null);
+
     const rootLView = createLView(
-        null, createTView(-1, null, 1, 0, null, null, null, null), rootContext, rootFlags, null,
-        null, rendererFactory, renderer, sanitizer, rootViewInjector);
+        null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
+        rootViewInjector);
+    rootLView[HEADER_OFFSET] = hostRNode;
 
     // rootView is the parent when bootstrapping
     const oldLView = enterView(rootLView, null);
 
     let component: T;
-    let tElementNode: TElementNode;
 
     // Will become true if the `try` block executes with no errors.
     let safeToRunHooks = false;
     try {
+      resetComponentState();
+      setPreviousOrParentTNode(hostTNode, true);
       const componentView = createRootComponentView(
-          hostRNode, this.componentDef, rootLView, rendererFactory, renderer);
-
-      tElementNode = getTNode(0, rootLView) as TElementNode;
+          hostTNode, this.componentDef, rootLView, rendererFactory, renderer);
 
       if (projectableNodes) {
         // projectable nodes can be passed as array of arrays or an array of iterables (ngUpgrade
         // case). Here we do normalize passed data structure to be an array of arrays to avoid
         // complex checks down the line.
-        tElementNode.projection =
+        hostTNode.projection =
             projectableNodes.map((nodesforSlot: RNode[]) => { return Array.from(nodesforSlot); });
       }
 
@@ -191,8 +197,10 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
       // executed here?
       // Angular 5 reference: https://stackblitz.com/edit/lifecycle-hooks-vcref
       component = createRootComponent(
-          componentView, this.componentDef, rootLView, rootContext, [LifecycleHooksFeature]);
+          componentView, this.componentDef, rootLView, rootContext, [LifecycleHooksFeature],
+          hostTNode);
 
+      // TODO(pk): I will be able to get rid of it
       addToViewTree(rootLView, componentView);
       refreshDescendantViews(rootLView);
       safeToRunHooks = true;
@@ -202,12 +210,12 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
 
     const componentRef = new ComponentRef(
         this.componentType, component,
-        createElementRef(viewEngine_ElementRef, tElementNode, rootLView), rootLView, tElementNode);
+        createElementRef(viewEngine_ElementRef, hostTNode, rootLView), rootLView, hostTNode);
 
     if (!rootSelectorOrNode || isIsolated) {
       // The host element of the internal or isolated root view is attached to the component's host
       // view node.
-      componentRef.hostView._tViewNode !.child = tElementNode;
+      componentRef.hostView._tViewNode !.child = hostTNode;
     }
     return componentRef;
   }

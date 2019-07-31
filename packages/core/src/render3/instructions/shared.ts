@@ -1009,16 +1009,15 @@ function createUnknownPropertyError(propName: string, tNode: TNode): Error {
  * Instantiate a root component.
  */
 export function instantiateRootComponent<T>(
-    tView: TView, viewData: LView, def: ComponentDef<T>): T {
-  const rootTNode = getPreviousOrParentTNode();
+    lView: LView, tView: TView, rootTNode: TNode, def: ComponentDef<T>): T {
   if (tView.firstTemplatePass) {
     if (def.providersResolver) def.providersResolver(def);
     generateExpandoInstructionBlock(tView, rootTNode, 1);
-    baseResolveDirective(tView, viewData, def, def.factory);
+    baseResolveDirective(tView, lView, def, def.factory);
   }
   const directive =
-      getNodeInjectable(tView.data, viewData, viewData.length - 1, rootTNode as TElementNode);
-  postProcessBaseDirective(viewData, rootTNode, directive);
+      getNodeInjectable(tView.data, lView, lView.length - 1, rootTNode as TElementNode);
+  postProcessBaseDirective(lView, rootTNode, directive);
   return directive;
 }
 
@@ -1085,7 +1084,8 @@ function instantiateAllDirectives(tView: TView, lView: LView, tNode: TNode) {
   for (let i = start; i < end; i++) {
     const def = tView.data[i] as DirectiveDef<any>;
     if (isComponentDef(def)) {
-      addComponentLogic(lView, tNode, def as ComponentDef<any>);
+      // TODO(pk): assert that tNode is of type TElementNode
+      createComponentView(lView, tNode as TElementNode, def as ComponentDef<any>);
     }
     const directive = getNodeInjectable(tView.data, lView !, i, tNode as TElementNode);
     postProcessDirective(lView, directive, def, i);
@@ -1233,12 +1233,11 @@ function findDirectiveMatches(
 }
 
 /** Stores index of component's host element so it will be queued for view refresh during CD. */
-export function queueComponentIndexForCheck(previousOrParentTNode: TNode): void {
-  const tView = getLView()[TVIEW];
+export function queueComponentIndexForCheck(tView: TView, hostTNode: TNode): void {
   ngDevMode &&
       assertEqual(tView.firstTemplatePass, true, 'Should only be called in first template pass.');
   (tView.components || (tView.components = ngDevMode ? new TViewComponents !() : [
-   ])).push(previousOrParentTNode.index);
+   ])).push(hostTNode.index);
 }
 
 
@@ -1283,6 +1282,7 @@ function saveNameToExportMap(
  * @param index the initial index
  */
 export function initNodeFlags(tNode: TNode, index: number, numberOfDirectives: number) {
+  // TODO(pk): assert on the first template pass only (!)
   const flags = tNode.flags;
   ngDevMode && assertEqual(
                    flags === 0 || flags === TNodeFlags.isComponent, true,
@@ -1306,30 +1306,34 @@ function baseResolveDirective<T>(
   viewData.push(nodeInjectorFactory);
 }
 
-function addComponentLogic<T>(
-    lView: LView, previousOrParentTNode: TNode, def: ComponentDef<T>): void {
-  const native = getNativeByTNode(previousOrParentTNode, lView);
+// TODO(pk): document
+export function createComponentView<T>(
+    lView: LView, hostTNode: TElementNode, def: ComponentDef<T>): LView {
+  const nativeRNode = getNativeByTNode(hostTNode, lView) as RElement;
+  const componentTView = getOrCreateTView(def);
 
-  const tView = getOrCreateTView(def);
+  const rendererFactory = lView[RENDERER_FACTORY];
+  const renderer = rendererFactory.createRenderer(nativeRNode as RElement, def);
+  const componentView = createLView(
+      lView, componentTView, null, def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways,
+      nativeRNode, hostTNode, rendererFactory, renderer);
 
   // Only component views should be added to the view tree directly. Embedded views are
   // accessed through their containers because they may be removed / re-added later.
-  const rendererFactory = lView[RENDERER_FACTORY];
-  const componentView = addToViewTree(
-      lView, createLView(
-                 lView, tView, null, def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways,
-                 lView[previousOrParentTNode.index], previousOrParentTNode as TElementNode,
-                 rendererFactory, rendererFactory.createRenderer(native as RElement, def)));
-
-  componentView[T_HOST] = previousOrParentTNode as TElementNode;
+  addToViewTree(lView, componentView);
 
   // Component view will always be created before any injected LContainers,
   // so this is a regular element, wrap it with the component view
-  lView[previousOrParentTNode.index] = componentView;
+  lView[hostTNode.index] = componentView;
 
-  if (lView[TVIEW].firstTemplatePass) {
-    queueComponentIndexForCheck(previousOrParentTNode);
+  // TODO(pk): get rid of it, this should be done when a directive is matched - this will allow us
+  // to get rid of the TView access and tView.firstTemplatePass check
+  const tView = lView[TVIEW];
+  if (tView.firstTemplatePass) {
+    queueComponentIndexForCheck(tView, hostTNode);
   }
+
+  return componentView;
 }
 
 export function elementAttributeInternal(
