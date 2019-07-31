@@ -1220,6 +1220,7 @@ function findDirectiveMatches(
         if (isComponentDef(def)) {
           if (tNode.flags & TNodeFlags.isComponent) throwMultipleComponentError(tNode);
           tNode.flags = TNodeFlags.isComponent;
+          queueComponentIndexForCheck(tView, tNode);
 
           // The component is always stored first with directives after.
           matches.unshift(def);
@@ -1325,13 +1326,6 @@ export function createComponentView<T>(
   // Component view will always be created before any injected LContainers,
   // so this is a regular element, wrap it with the component view
   lView[hostTNode.index] = componentView;
-
-  // TODO(pk): get rid of it, this should be done when a directive is matched - this will allow us
-  // to get rid of the TView access and tView.firstTemplatePass check
-  const tView = lView[TVIEW];
-  if (tView.firstTemplatePass) {
-    queueComponentIndexForCheck(tView, hostTNode);
-  }
 
   return componentView;
 }
