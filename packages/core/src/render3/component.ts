@@ -134,6 +134,8 @@ export function renderComponent<T>(
       opts.injector || null);
   const hostTNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Element, null, null);
   rootView[HEADER_OFFSET] = hostRNode;
+
+  hostTNode.flags = TNodeFlags.isComponent;
   queueComponentIndexForCheck(rootTView, hostTNode);
 
   const oldView = enterView(rootView, null);
@@ -152,7 +154,7 @@ export function renderComponent<T>(
     // TODO(pk): this should be part of the common / shared code
     diPublicInInjector(
         getOrCreateNodeInjectorForNode(hostTNode, rootView), rootTView, componentDef.type);
-    hostTNode.flags = TNodeFlags.isComponent;
+
     initNodeFlags(hostTNode, rootView.length, 1);
 
 

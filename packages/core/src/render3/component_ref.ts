@@ -171,6 +171,8 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
         null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
         rootViewInjector);
     rootLView[HEADER_OFFSET] = hostRNode;
+
+    hostTNode.flags = TNodeFlags.isComponent;
     queueComponentIndexForCheck(rootTView, hostTNode);
 
     // rootView is the parent when bootstrapping
@@ -184,11 +186,10 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
       resetComponentState();
       setPreviousOrParentTNode(hostTNode, true);
       const componentView = createComponentView(rootLView, hostTNode, this.componentDef, renderer);
-
       // TODO(pk): this should be part of the common / shared code
       diPublicInInjector(
           getOrCreateNodeInjectorForNode(hostTNode, rootLView), rootTView, this.componentType);
-      hostTNode.flags = TNodeFlags.isComponent;
+
       initNodeFlags(hostTNode, rootLView.length, 1);
 
       if (projectableNodes) {
