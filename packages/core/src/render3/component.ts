@@ -16,17 +16,17 @@ import {assertComponentType} from './assert';
 import {getComponentDef} from './definition';
 import {diPublicInInjector, getOrCreateNodeInjectorForNode} from './di';
 import {registerPostOrderHooks, registerPreOrderHooks} from './hooks';
-import {CLEAN_PROMISE, createComponentView, createLView, createTView, getOrCreateTNode, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, queueComponentIndexForCheck, refreshDescendantViews} from './instructions/shared';
+import {CLEAN_PROMISE, createComponentView, createLView, createTNode, createTView, getOrCreateTNode, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, markTNodeAsComponentHost, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef, ComponentType, RenderFlags} from './interfaces/definition';
-import {TElementNode, TNode, TNodeFlags, TNodeType} from './interfaces/node';
+import {TElementNode, TNode, TNodeType} from './interfaces/node';
 import {PlayerHandler} from './interfaces/player';
-import {RElement, Renderer3, RendererFactory3, domRendererFactory3} from './interfaces/renderer';
-import {CONTEXT, FLAGS, HEADER_OFFSET, LView, LViewFlags, RootContext, RootContextFlags, TVIEW} from './interfaces/view';
+import {RElement, RNode, RendererFactory3, domRendererFactory3} from './interfaces/renderer';
+import {CONTEXT, FLAGS, HEADER_OFFSET, LView, LViewFlags, RootContext, RootContextFlags, TVIEW, TView} from './interfaces/view';
 import {enterView, leaveView, resetComponentState, setActiveHostElement, setPreviousOrParentTNode} from './state';
 import {publishDefaultGlobalUtils} from './util/global_utils';
 import {defaultScheduler, stringifyForError} from './util/misc_utils';
 import {getRootContext} from './util/view_traversal_utils';
-import {getNativeByTNode, readPatchedLView, resetPreOrderHookFlags} from './util/view_utils';
+import {readPatchedLView, resetPreOrderHookFlags} from './util/view_utils';
 
 
 
@@ -128,15 +128,14 @@ export function renderComponent<T>(
   const rootContext = createRootContext(opts.scheduler, opts.playerHandler);
 
   const renderer = rendererFactory.createRenderer(hostRNode, componentDef);
+
   const rootTView = createTView(-1, null, 1, 0, null, null, null, null);
+  const hostTNode = createRootComponentHost(rootTView);
+
   const rootView: LView = createLView(
       null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
       opts.injector || null);
-  const hostTNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Element, null, null);
   rootView[HEADER_OFFSET] = hostRNode;
-
-  hostTNode.flags = TNodeFlags.isComponent;
-  queueComponentIndexForCheck(rootTView, hostTNode);
 
   const oldView = enterView(rootView, null);
   let component: T;
@@ -210,6 +209,26 @@ export function createRootComponent<T>(
   return component;
 }
 
+// TODO(pk): document
+export function createRootComponentHost(
+    tView: TView, projectableNodes?: any[][] | undefined): TElementNode {
+  const adjustedIndex = HEADER_OFFSET + 0;
+  const hostTNode =
+      createTNode(tView, null, TNodeType.Element, adjustedIndex, null, null) as TElementNode;
+  tView.data[adjustedIndex] = hostTNode;
+  tView.firstChild = hostTNode;
+  markTNodeAsComponentHost(tView, hostTNode);
+
+  if (projectableNodes) {
+    // Projectable nodes can be passed as array of arrays or an array of iterables (ngUpgrade
+    // case). Here we do normalize passed data structure to be an array of arrays to avoid
+    // complex checks down the line.
+    hostTNode.projection =
+        projectableNodes.map((nodesforSlot: RNode[]) => { return Array.from(nodesforSlot); });
+  }
+
+  return hostTNode;
+}
 
 export function createRootContext(
     scheduler?: (workFn: () => void) => void, playerHandler?: PlayerHandler|null): RootContext {

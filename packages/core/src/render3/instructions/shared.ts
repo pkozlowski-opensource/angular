@@ -1219,8 +1219,7 @@ function findDirectiveMatches(
 
         if (isComponentDef(def)) {
           if (tNode.flags & TNodeFlags.isComponent) throwMultipleComponentError(tNode);
-          tNode.flags = TNodeFlags.isComponent;
-          queueComponentIndexForCheck(tView, tNode);
+          markTNodeAsComponentHost(tView, tNode);
 
           // The component is always stored first with directives after.
           matches.unshift(def);
@@ -1233,10 +1232,15 @@ function findDirectiveMatches(
   return matches;
 }
 
-/** Stores index of component's host element so it will be queued for view refresh during CD. */
-export function queueComponentIndexForCheck(tView: TView, hostTNode: TNode): void {
+/**
+ * Marks a given TNode as a component's host. This consists of:
+ * - setting appropriate TNode flags;
+ * - storing index of component's host element so it will be queued for view refresh during CD.
+ */
+export function markTNodeAsComponentHost(tView: TView, hostTNode: TNode): void {
   ngDevMode &&
       assertEqual(tView.firstTemplatePass, true, 'Should only be called in first template pass.');
+  hostTNode.flags = TNodeFlags.isComponent;
   (tView.components || (tView.components = ngDevMode ? new TViewComponents !() : [
    ])).push(hostTNode.index);
 }
