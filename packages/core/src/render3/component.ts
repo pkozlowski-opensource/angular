@@ -16,7 +16,7 @@ import {assertComponentType} from './assert';
 import {getComponentDef} from './definition';
 import {diPublicInInjector, getOrCreateNodeInjectorForNode} from './di';
 import {registerPostOrderHooks, registerPreOrderHooks} from './hooks';
-import {CLEAN_PROMISE, createComponentView, createLView, createTNode, createTView, getOrCreateTNode, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, markTNodeAsComponentHost, refreshDescendantViews} from './instructions/shared';
+import {CLEAN_PROMISE, createComponentView, createLView, createTNode, createTView, initNodeFlags, instantiateRootComponent, invokeHostBindingsInCreationMode, locateHostElement, markTNodeAsComponentHost, refreshDescendantViews} from './instructions/shared';
 import {ComponentDef, ComponentType, RenderFlags} from './interfaces/definition';
 import {TElementNode, TNode, TNodeType} from './interfaces/node';
 import {PlayerHandler} from './interfaces/player';
@@ -137,6 +137,9 @@ export function renderComponent<T>(
       opts.injector || null);
   rootView[HEADER_OFFSET] = hostRNode;
 
+  const componentView = createComponentView(rootView, hostTNode, componentDef, renderer);
+  resolveRootComponent(rootView, rootTView, hostTNode, componentDef.type);
+
   const oldView = enterView(rootView, null);
   let component: T;
 
@@ -146,16 +149,6 @@ export function renderComponent<T>(
     if (rendererFactory.begin) rendererFactory.begin();
     resetComponentState();
     setPreviousOrParentTNode(hostTNode, true);
-
-    // TODO(pk): this should be done earlier on
-    const componentView = createComponentView(rootView, hostTNode, componentDef, renderer);
-
-    // TODO(pk): this should be part of the common / shared code
-    diPublicInInjector(
-        getOrCreateNodeInjectorForNode(hostTNode, rootView), rootTView, componentDef.type);
-
-    initNodeFlags(hostTNode, rootView.length, 1);
-
 
     component = createRootComponent(
         componentView, componentDef, rootView, rootContext, opts.hostFeatures || null, hostTNode);
@@ -171,6 +164,17 @@ export function renderComponent<T>(
   }
 
   return component;
+}
+
+/**
+ * Light version of resolve directives
+ * // TODO(pk): document more
+ */
+export function resolveRootComponent<T>(
+    rootLView: LView, rootTView: TView, hostTNode: TElementNode, componentType: Type<T>) {
+  diPublicInInjector(
+      getOrCreateNodeInjectorForNode(hostTNode, rootLView), rootTView, componentType);
+  initNodeFlags(hostTNode, rootLView.length, 1);
 }
 
 /**
