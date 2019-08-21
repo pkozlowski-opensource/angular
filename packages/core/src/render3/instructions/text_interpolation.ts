@@ -5,8 +5,11 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import {bindingUpdated} from '../bindings';
+import {BINDING_INDEX} from '../interfaces/view';
 import {getLView, getSelectedIndex} from '../state';
 import {NO_CHANGE} from '../tokens';
+import {renderStringify} from '../util/misc_utils';
 
 import {interpolation1, interpolation2, interpolation3, interpolation4, interpolation5, interpolation6, interpolation7, interpolation8, interpolationV} from './interpolation';
 import {TsickleIssue1009, textBindingInternal} from './shared';
@@ -33,7 +36,10 @@ import {TsickleIssue1009, textBindingInternal} from './shared';
  * @codeGenApi
  */
 export function ɵɵtextInterpolate(v0: any): TsickleIssue1009 {
-  ɵɵtextInterpolate1('', v0, '');
+  const lView = getLView();
+  if (bindingUpdated(lView, lView[BINDING_INDEX]++, v0)) {
+    textBindingInternal(lView, getSelectedIndex(), renderStringify(v0));
+  }
   return ɵɵtextInterpolate;
 }
 
@@ -59,9 +65,8 @@ export function ɵɵtextInterpolate(v0: any): TsickleIssue1009 {
  */
 export function ɵɵtextInterpolate1(prefix: string, v0: any, suffix: string): TsickleIssue1009 {
   const lView = getLView();
-  const interpolated = interpolation1(lView, prefix, v0, suffix);
-  if (interpolated !== NO_CHANGE) {
-    textBindingInternal(lView, getSelectedIndex(), interpolated as string);
+  if (bindingUpdated(lView, lView[BINDING_INDEX]++, v0)) {
+    textBindingInternal(lView, getSelectedIndex(), prefix + renderStringify(v0) + suffix);
   }
   return ɵɵtextInterpolate1;
 }
