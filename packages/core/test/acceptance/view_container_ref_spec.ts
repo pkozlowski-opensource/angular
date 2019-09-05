@@ -1278,6 +1278,103 @@ describe('ViewContainerRef', () => {
 
   });
 
+  fdescribe('before view insertion', () => {
+
+    @Directive({selector: '[tplRefInserter]', exportAs: 'tplRefInserter'})
+    class TplRefInsertingDirective {
+      constructor(private _vcRef: ViewContainerRef) {}
+
+      insert(tplRef: TemplateRef<{}>, index: number) {
+        this._vcRef.createEmbeddedView(tplRef, {}, index);
+      }
+    }
+
+    @Component({selector: 'view-inserting', template: ''})
+    class ViewInsertingTestCmpt {
+      @ViewChild('first', {static: true}) firstTpl !: TemplateRef<{}>;
+      @ViewChild('last', {static: true}) lastTpl !: TemplateRef<{}>;
+      @ViewChild(TplRefInsertingDirective, {static: true}) inserter !: TplRefInsertingDirective;
+
+      insertViews() {
+        this.inserter.insert(this.lastTpl, 0);
+        // insert in front of the "last" view
+        this.inserter.insert(this.firstTpl, 0);
+      }
+    }
+
+    beforeEach(() => {
+      TestBed.configureTestingModule(
+          {declarations: [TplRefInsertingDirective, ViewInsertingTestCmpt]});
+    });
+
+
+    it('should insert in front of a view with text as the first child', () => {
+      TestBed.overrideTemplate(ViewInsertingTestCmpt, `
+        <ng-template #first>first</ng-template>
+        <ng-template #last>|last</ng-template>
+        <ng-template tplRefInserter></ng-template>
+      `);
+
+      const fixture = TestBed.createComponent(ViewInsertingTestCmpt);
+      fixture.componentInstance.insertViews();
+
+      expect(fixture.debugElement.nativeNode.textContent).toBe('first|last');
+    });
+
+    it('should insert in front of a view with an element as the first child', () => {
+      TestBed.overrideTemplate(ViewInsertingTestCmpt, `
+        <ng-template #first>first</ng-template>
+        <ng-template #last><div>|last</div></ng-template>
+        <ng-template tplRefInserter></ng-template>
+      `);
+
+      const fixture = TestBed.createComponent(ViewInsertingTestCmpt);
+      fixture.componentInstance.insertViews();
+
+      expect(fixture.debugElement.nativeNode.textContent).toBe('first|last');
+    });
+
+    it('should insert in front of a view with an element container as the first child', () => {
+      TestBed.overrideTemplate(ViewInsertingTestCmpt, `
+        <ng-template #first>first</ng-template>
+        <ng-template #last><ng-container>|last</ng-container></ng-template>
+        <ng-template tplRefInserter></ng-template>
+      `);
+
+      const fixture = TestBed.createComponent(ViewInsertingTestCmpt);
+      fixture.componentInstance.insertViews();
+
+      expect(fixture.debugElement.nativeNode.textContent).toBe('first|last');
+    });
+
+    it('should insert in front of a view with an element container as the first child', () => {
+      TestBed.overrideTemplate(ViewInsertingTestCmpt, `
+        <ng-template #first>first</ng-template>
+        <ng-template #last><ng-container>|last</ng-container></ng-template>
+        <ng-template tplRefInserter></ng-template>
+      `);
+
+      const fixture = TestBed.createComponent(ViewInsertingTestCmpt);
+      fixture.componentInstance.insertViews();
+
+      expect(fixture.debugElement.nativeNode.textContent).toBe('first|last');
+    });
+
+    it('should insert in front of a view with a container as the first child', () => {
+      TestBed.overrideTemplate(ViewInsertingTestCmpt, `
+        <ng-template #first>first</ng-template>
+        <ng-template #last><ng-template [ngIf]="true">|last</ng-template></ng-template>
+        <ng-template tplRefInserter></ng-template>
+      `);
+
+      const fixture = TestBed.createComponent(ViewInsertingTestCmpt);
+      fixture.componentInstance.insertViews();
+
+      expect(fixture.debugElement.nativeNode.textContent).toBe('first|last');
+    });
+
+  });
+
   describe('lifecycle hooks', () => {
 
     // Angular 5 reference: https://stackblitz.com/edit/lifecycle-hooks-vcref
