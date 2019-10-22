@@ -33,7 +33,7 @@ function test1Template(rf: RenderFlags, ctx: any) {
     ɵɵelementEnd();
   }
   if (rf & 2) {
-    ɵɵclassMap(choseClasses ? CLASSES_1_A : CLASSES_1_B);
+    ɵɵclassMap(toggleClasses ? CLASSES_1_A : CLASSES_1_B);
   }
 }
 
@@ -43,7 +43,7 @@ function test2Template(rf: RenderFlags, ctx: any) {
     ɵɵelementEnd();
   }
   if (rf & 2) {
-    ɵɵclassMap(choseClasses ? CLASSES_2_A : CLASSES_2_B);
+    ɵɵclassMap(toggleClasses ? CLASSES_2_A : CLASSES_2_B);
   }
 }
 
@@ -53,7 +53,7 @@ function test10Template(rf: RenderFlags, ctx: any) {
     ɵɵelementEnd();
   }
   if (rf & 2) {
-    ɵɵclassMap(choseClasses ? CLASSES_10_A : CLASSES_10_B);
+    ɵɵclassMap(toggleClasses ? CLASSES_10_A : CLASSES_10_B);
   }
 }
 
@@ -63,7 +63,7 @@ function testDirectTemplate(rf: RenderFlags, ctx: any) {
     ɵɵelementEnd();
   }
   if (rf & 2) {
-    ɵɵproperty('className', choseClasses ? CLASSES_10_A : CLASSES_10_B);
+    ɵɵproperty('className', toggleClasses ? CLASSES_10_A : CLASSES_10_B);
   }
 }
 
@@ -87,28 +87,28 @@ const classMapDirect = classBindingBenchmark('classMapDirect');
 // run change detection in the update mode
 console.profile('class_map_1');
 while (class1Map()) {
-  choseClasses = !choseClasses;
+  toggleClasses = !toggleClasses;
   refreshView(root1LView, root1TView, null, null);
 }
 console.profileEnd();
 
 console.profile('class_map_2');
 while (class2Map()) {
-  choseClasses = !choseClasses;
+  toggleClasses = !toggleClasses;
   refreshView(root2LView, root2TView, null, null);
 }
 console.profileEnd();
 
 console.profile('class_map_10');
 while (class10Map()) {
-  choseClasses = !choseClasses;
+  toggleClasses = !toggleClasses;
   refreshView(root10LView, root10TView, null, null);
 }
 console.profileEnd();
 
 console.profile('class_map_direct');
 while (classMapDirect()) {
-  choseClasses = !choseClasses;
+  toggleClasses = !toggleClasses;
   refreshView(rootDirectLView, rootDirectTView, null, null);
 }
 console.profileEnd();
