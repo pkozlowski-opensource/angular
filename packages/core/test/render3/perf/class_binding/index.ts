@@ -21,7 +21,7 @@ const CLASSES_2_A = 'one two';
 const CLASSES_2_B = CLASSES_2_A.toUpperCase();
 const CLASSES_10_A = 'one two three four five six seven eight nine ten';
 const CLASSES_10_B = CLASSES_10_A.toUpperCase();
-let choseClasses = true;
+let toggleClasses = true;
 
 `<ng-template>
   <div [class]=" choseClasses ? CLASSES_A: CLASSES_B ">
