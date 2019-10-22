@@ -8,11 +8,22 @@
 import {addToViewTree, createLContainer, createLView, createTNode, createTView, getOrCreateTNode, renderView} from '../../../src/render3/instructions/shared';
 import {ComponentTemplate} from '../../../src/render3/interfaces/definition';
 import {TAttributes, TNodeType, TViewNode} from '../../../src/render3/interfaces/node';
-import {RComment} from '../../../src/render3/interfaces/renderer';
+import {RComment, RElement, RendererFactory3, domRendererFactory3} from '../../../src/render3/interfaces/renderer';
 import {LView, LViewFlags, TView} from '../../../src/render3/interfaces/view';
 import {insertView} from '../../../src/render3/node_manipulation';
 
 import {NoopRenderer, NoopRendererFactory, WebWorkerRenderNode} from './noop_renderer';
+
+const isBrowser = typeof process === 'undefined';
+const DomOrMockDivNode =
+    (isBrowser ?  // In browser testing use real DOM
+         function() { return document.createElement('div'); } as unknown :
+         WebWorkerRenderNode) as{new (): RElement};
+const DomOrMockCommentNode =
+    (isBrowser ?  // In browser testing use real DOM
+         Comment :
+         WebWorkerRenderNode) as{new (): RComment};
+const rendererFactory: RendererFactory3 = isBrowser ? domRendererFactory3 : new NoopRendererFactory;
 
 export function createAndRenderLView(
     parentLView: LView | null, tView: TView, hostTNode: TViewNode) {
@@ -28,12 +39,14 @@ export function setupRootViewWithEmbeddedViews(
   // Create a root view with a container
   const rootTView = createTView(-1, null, 1, 0, null, null, null, null, consts);
   const tContainerNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Container, null, null);
+  const hostNode = new DomOrMockDivNode();
+  const renderer = rendererFactory.createRenderer(hostNode, null);
   const rootLView = createLView(
-      null, rootTView, {}, LViewFlags.CheckAlways | LViewFlags.IsRoot, null, null,
-      new NoopRendererFactory(), new NoopRenderer());
-  const mockRNode = new WebWorkerRenderNode();
-  const lContainer = createLContainer(
-      mockRNode as RComment, rootLView, mockRNode as RComment, tContainerNode, true);
+      null, rootTView, {}, LViewFlags.CheckAlways | LViewFlags.IsRoot, hostNode, null,
+      rendererFactory, renderer);
+  const mockRCommentNode = new DomOrMockCommentNode();
+  const lContainer =
+      createLContainer(mockRCommentNode, rootLView, mockRCommentNode, tContainerNode, true);
   addToViewTree(rootLView, lContainer);
 
 
