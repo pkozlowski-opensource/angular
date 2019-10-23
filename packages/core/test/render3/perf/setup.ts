@@ -12,7 +12,7 @@ import {RComment, RElement, RendererFactory3, domRendererFactory3} from '../../.
 import {LView, LViewFlags, TView} from '../../../src/render3/interfaces/view';
 import {insertView} from '../../../src/render3/node_manipulation';
 
-import {NoopRenderer, NoopRendererFactory, WebWorkerRenderNode} from './noop_renderer';
+import {NoopRendererFactory, WebWorkerRenderNode} from './noop_renderer';
 
 const isBrowser = typeof process === 'undefined';
 const DomOrMockDivNode =
@@ -24,12 +24,12 @@ const DomOrMockCommentNode =
          Comment :
          WebWorkerRenderNode) as{new (): RComment};
 const rendererFactory: RendererFactory3 = isBrowser ? domRendererFactory3 : new NoopRendererFactory;
+const renderer = rendererFactory.createRenderer(null, null);
 
 export function createAndRenderLView(
     parentLView: LView | null, tView: TView, hostTNode: TViewNode) {
   const embeddedLView = createLView(
-      parentLView, tView, {}, LViewFlags.CheckAlways, null, hostTNode, new NoopRendererFactory(),
-      new NoopRenderer());
+      parentLView, tView, {}, LViewFlags.CheckAlways, null, hostTNode, rendererFactory, renderer);
   renderView(embeddedLView, tView, null);
 }
 
@@ -40,7 +40,6 @@ export function setupRootViewWithEmbeddedViews(
   const rootTView = createTView(-1, null, 1, 0, null, null, null, null, consts);
   const tContainerNode = getOrCreateTNode(rootTView, null, 0, TNodeType.Container, null, null);
   const hostNode = new DomOrMockDivNode();
-  const renderer = rendererFactory.createRenderer(hostNode, null);
   const rootLView = createLView(
       null, rootTView, {}, LViewFlags.CheckAlways | LViewFlags.IsRoot, hostNode, null,
       rendererFactory, renderer);
@@ -58,7 +57,7 @@ export function setupRootViewWithEmbeddedViews(
   for (let i = 0; i < noOfViews; i++) {
     const embeddedLView = createLView(
         rootLView, embeddedTView, embeddedViewContext, LViewFlags.CheckAlways, null, viewTNode,
-        new NoopRendererFactory(), new NoopRenderer());
+        rendererFactory, renderer);
     renderView(embeddedLView, embeddedTView, null);
     insertView(embeddedLView, lContainer, i);
   }
