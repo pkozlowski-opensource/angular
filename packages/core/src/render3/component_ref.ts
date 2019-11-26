@@ -202,11 +202,6 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
         this.componentType, component,
         createElementRef(viewEngine_ElementRef, tElementNode, rootLView), rootLView, tElementNode);
 
-    if (!rootSelectorOrNode || isIsolated) {
-      // The host element of the internal or isolated root view is attached to the component's host
-      // view node.
-      componentRef.hostView._tViewNode !.child = tElementNode;
-    }
     return componentRef;
   }
 }
@@ -246,7 +241,6 @@ export class ComponentRef<T> extends viewEngine_ComponentRef<T> {
     super();
     this.instance = instance;
     this.hostView = this.changeDetectorRef = new RootViewRef<T>(_rootLView);
-    this.hostView._tViewNode = assignTViewNodeToLView(_rootLView[TVIEW], null, -1, _rootLView);
     this.componentType = componentType;
   }
 
