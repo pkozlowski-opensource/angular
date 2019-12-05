@@ -381,7 +381,6 @@ export function refreshView<T>(
     lView: LView, tView: TView, templateFn: ComponentTemplate<{}>| null, context: T) {
   ngDevMode && assertEqual(isCreationMode(lView), false, 'Should be run in update mode');
   const flags = lView[FLAGS];
-  if ((flags & LViewFlags.Destroyed) === LViewFlags.Destroyed) return;
   enterView(lView, lView[T_HOST]);
   try {
     resetPreOrderHookFlags(lView);
@@ -1724,6 +1723,7 @@ export function tickRootContext(rootContext: RootContext) {
 }
 
 export function detectChangesInternal<T>(view: LView, context: T) {
+  if ((view[FLAGS] & LViewFlags.Destroyed) === LViewFlags.Destroyed) return;
   const rendererFactory = view[RENDERER_FACTORY];
   if (rendererFactory.begin) rendererFactory.begin();
   try {
