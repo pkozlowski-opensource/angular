@@ -193,7 +193,10 @@ export declare class NgClass implements DoCheck {
         [klass: string]: any;
     };
     constructor(_iterableDiffers: IterableDiffers, _keyValueDiffers: KeyValueDiffers, _ngEl: ElementRef, _renderer: Renderer2);
+    applyChanges(): void;
     ngDoCheck(): void;
+    setClass(value: string): void;
+    setNgClass(value: any): void;
 }
 
 export declare class NgComponentOutlet implements OnChanges, OnDestroy {
@@ -267,7 +270,9 @@ export declare class NgStyle implements DoCheck {
         [klass: string]: any;
     } | null;
     constructor(_ngEl: ElementRef, _differs: KeyValueDiffers, _renderer: Renderer2);
+    applyChanges(): void;
     ngDoCheck(): void;
+    setNgStyle(value: any): void;
 }
 
 export declare class NgSwitch {
