@@ -20,7 +20,7 @@ export function assertNumber(actual: any, msg: string) {
 
 export function assertString(actual: any, msg: string) {
   if (typeof actual != 'string') {
-    throwError(msg, typeof actual, 'string', '===');
+    throwError(msg, actual === null ? 'null' : typeof actual, 'string', '===');
   }
 }
 
@@ -85,7 +85,7 @@ export function throwError(msg: string, actual?: any, expected?: any, comparison
   debugger;  // Left intentionally for better debugger experience.
   throw new Error(
       `ASSERTION ERROR: ${msg}` +
-      (comparison == null ? '' : ` [Expected-> ${expected} ${comparison} ${actual} <-Actual]`));
+      (comparison == null ? '' : ` [Expected=> ${expected} ${comparison} ${actual} <=Actual]`));
 }
 
 export function assertDomNode(node: any) {
@@ -101,4 +101,10 @@ export function assertDomNode(node: any) {
 export function assertDataInRange(arr: any[], index: number) {
   const maxLen = arr ? arr.length : 0;
   assertLessThan(index, maxLen, `Index expected to be less than ${maxLen} but got ${index}`);
+}
+
+
+export function warn(text: string): void {
+  // tslint:disable-next-line:no-console
+  console.warn(text);
 }

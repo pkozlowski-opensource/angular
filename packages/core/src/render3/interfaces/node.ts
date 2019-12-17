@@ -588,20 +588,8 @@ export interface TNode {
    * This field will be populated if and when:
    *
    * - There are one or more initial styles on an element (e.g. `<div style="width:200px">`)
-   * - There are one or more style bindings on an element (e.g. `<div [style.width]="w">`)
-   *
-   * If and when there are only initial styles (no bindings) then an instance of `StylingMapArray`
-   * will be used here. Otherwise an instance of `TStylingContext` will be created when there
-   * are one or more style bindings on an element.
-   *
-   * During element creation this value is likely to be populated with an instance of
-   * `StylingMapArray` and only when the bindings are evaluated (which happens during
-   * update mode) then it will be converted to a `TStylingContext` if any style bindings
-   * are encountered. If and when this happens then the existing `StylingMapArray` value
-   * will be placed into the initial styling slot in the newly created `TStylingContext`.
    */
-  // TODO(misko): `Remove StylingMapArray|TStylingContext|null` in follow up PR.
-  styles: StylingMapArray|TStylingContext|string|null;
+  styles: string|null;
 
   /**
    * A collection of all class bindings and/or static class values for an element.
@@ -609,20 +597,8 @@ export interface TNode {
    * This field will be populated if and when:
    *
    * - There are one or more initial classes on an element (e.g. `<div class="one two three">`)
-   * - There are one or more class bindings on an element (e.g. `<div [class.foo]="f">`)
-   *
-   * If and when there are only initial classes (no bindings) then an instance of `StylingMapArray`
-   * will be used here. Otherwise an instance of `TStylingContext` will be created when there
-   * are one or more class bindings on an element.
-   *
-   * During element creation this value is likely to be populated with an instance of
-   * `StylingMapArray` and only when the bindings are evaluated (which happens during
-   * update mode) then it will be converted to a `TStylingContext` if any class bindings
-   * are encountered. If and when this happens then the existing `StylingMapArray` value
-   * will be placed into the initial styling slot in the newly created `TStylingContext`.
    */
-  // TODO(misko): `Remove StylingMapArray|TStylingContext|null` in follow up PR.
-  classes: StylingMapArray|TStylingContext|string|null;
+  classes: string|null;
 
   /**
    * Stores the head/tail index of the class bindings.
@@ -842,3 +818,53 @@ export type TNodeWithLocalRefs = TContainerNode | TElementNode | TElementContain
  * - `<ng-template #tplRef>` - `tplRef` should point to the `TemplateRef` instance;
  */
 export type LocalRefExtractor = (tNode: TNodeWithLocalRefs, currentView: LView) => any;
+
+/**
+ * Returns `true` if the `TNode` has a directive which has `@Input()` for `class` binding.
+ *
+ * ```
+ * <div my-dir [class]="exp"></div>
+ * ```
+ * and
+ * ```
+ * @Directive({
+ * })
+ * class MyDirective {
+ *   @Input()
+ *   class: string;
+ * }
+ * ```
+ *
+ * In the above case it is necessary to write the reconciled styling information into the
+ * directive's input.
+ *
+ * @param tNode
+ */
+export function hasClassInput(tNode: TNode) {
+  return (tNode.flags & TNodeFlags.hasClassInput) !== 0;
+}
+
+/**
+ * Returns `true` if the `TNode` has a directive which has `@Input()` for `style` binding.
+ *
+ * ```
+ * <div my-dir [style]="exp"></div>
+ * ```
+ * and
+ * ```
+ * @Directive({
+ * })
+ * class MyDirective {
+ *   @Input()
+ *   class: string;
+ * }
+ * ```
+ *
+ * In the above case it is necessary to write the reconciled styling information into the
+ * directive's input.
+ *
+ * @param tNode
+ */
+export function hasStyleInput(tNode: TNode) {
+  return (tNode.flags & TNodeFlags.hasStyleInput) !== 0;
+}

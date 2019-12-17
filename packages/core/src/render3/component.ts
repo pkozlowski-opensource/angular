@@ -21,14 +21,15 @@ import {ComponentDef, ComponentType, RenderFlags} from './interfaces/definition'
 import {TElementNode, TNode, TNodeType} from './interfaces/node';
 import {PlayerHandler} from './interfaces/player';
 import {RElement, Renderer3, RendererFactory3, domRendererFactory3} from './interfaces/renderer';
-import {CONTEXT, HEADER_OFFSET, LView, LViewFlags, RootContext, RootContextFlags, TVIEW, TViewType} from './interfaces/view';
-import {enterView, getPreviousOrParentTNode, incrementActiveDirectiveId, leaveView, setActiveHostElement} from './state';
+import {CONTEXT, HEADER_OFFSET, LView, LViewFlags, RENDERER, RootContext, RootContextFlags, TVIEW, TViewType} from './interfaces/view';
+import {enterView, getPreviousOrParentTNode, leaveView, setActiveHostElement} from './state';
+import {writeDirectClass, writeDirectStyle} from './styling/reconcile';
 import {computeStaticStyling} from './styling/static_styling';
 import {setUpAttributes} from './util/attrs_utils';
 import {publishDefaultGlobalUtils} from './util/global_utils';
 import {defaultScheduler, stringifyForError} from './util/misc_utils';
 import {getRootContext} from './util/view_traversal_utils';
-import {readPatchedLView} from './util/view_utils';
+import {getNativeByTNode, readPatchedLView} from './util/view_utils';
 
 
 
@@ -177,7 +178,12 @@ export function createRootComponentView(
     computeStaticStyling(tNode, mergedAttrs);
     if (rNode !== null) {
       setUpAttributes(renderer, rNode, mergedAttrs);
-      renderInitialStyling(renderer, rNode, tNode, false);
+      if (tNode.classes !== null) {
+        writeDirectClass(renderer, rNode, tNode.classes);
+      }
+      if (tNode.styles !== null) {
+        writeDirectStyle(renderer, rNode, tNode.styles);
+      }
     }
   }
   const componentView = createLView(
@@ -220,24 +226,24 @@ export function createRootComponent<T>(
   }
 
   const rootTNode = getPreviousOrParentTNode();
-  // TODO(misko-next): This is a temporary work around for the fact that we moved the information
-  // from instruction to declaration. The workaround is to just call the instruction as if it was
-  // part of the `hostAttrs`.
-  // The check for componentDef.hostBindings is wrong since now some directives may not
-  // have componentDef.hostBindings but they still need to process hostVars and hostAttrs
   if (tView.firstCreatePass &&
       (componentDef.hostBindings !== null || componentDef.hostAttrs !== null)) {
     const elementIndex = rootTNode.index - HEADER_OFFSET;
     setActiveHostElement(elementIndex);
-    incrementActiveDirectiveId();
 
     const rootTView = rootLView[TVIEW];
     addHostBindingsToExpandoInstructions(rootTView, componentDef);
     growHostVarsSpace(rootTView, rootLView, componentDef.hostVars);
 
     invokeHostBindingsInCreationMode(componentDef, component, rootTNode);
-
-    setActiveHostElement(null);
+  }
+  const renderer = rootLView[RENDERER];
+  const native = getNativeByTNode(rootTNode, rootLView) as RElement;
+  if (rootTNode.classes) {
+    writeDirectClass(renderer, native, rootTNode.classes);
+  }
+  if (rootTNode.styles) {
+    writeDirectStyle(renderer, native, rootTNode.styles);
   }
 
   return component;
