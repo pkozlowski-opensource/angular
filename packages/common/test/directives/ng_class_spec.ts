@@ -161,12 +161,12 @@ import {ComponentFixture, TestBed, async} from '@angular/core/testing';
          }));
 
       it('should take initial classes into account when a reference changes', async(() => {
-            fixture = createTestComponent('<div class="foo" [ngClass]="arrExpr"></div>');
-            detectChangesAndExpectClassName('foo');
+           fixture = createTestComponent('<div class="foo" [ngClass]="arrExpr"></div>');
+           detectChangesAndExpectClassName('foo');
 
-            getComponent().arrExpr = ['bar'];
-            detectChangesAndExpectClassName('foo bar');
-          }));
+           getComponent().arrExpr = ['bar'];
+           detectChangesAndExpectClassName('foo bar');
+         }));
 
       it('should ignore empty or blank class names', async(() => {
            fixture = createTestComponent('<div class="foo" [ngClass]="arrExpr"></div>');
@@ -244,13 +244,13 @@ import {ComponentFixture, TestBed, async} from '@angular/core/testing';
          }));
 
       it('should take initial classes into account when switching from string to null',
-          async(() => {
-            fixture = createTestComponent(`<div class="foo" [ngClass]="strExpr"></div>`);
-            detectChangesAndExpectClassName('foo');
+         async(() => {
+           fixture = createTestComponent(`<div class="foo" [ngClass]="strExpr"></div>`);
+           detectChangesAndExpectClassName('foo');
 
-            getComponent().strExpr = null;
-            detectChangesAndExpectClassName('foo');
-          }));
+           getComponent().strExpr = null;
+           detectChangesAndExpectClassName('foo');
+         }));
 
       it('should ignore empty and blank strings', async(() => {
            fixture = createTestComponent(`<div class="foo" [ngClass]="strExpr"></div>`);
@@ -263,18 +263,18 @@ import {ComponentFixture, TestBed, async} from '@angular/core/testing';
     describe('cooperation with other class-changing constructs', () => {
 
       it('should co-operate with the class attribute', async(() => {
-            fixture = createTestComponent('<div [ngClass]="objExpr" class="init foo"></div>');
-            const objExpr = getComponent().objExpr;
+           fixture = createTestComponent('<div [ngClass]="objExpr" class="init foo"></div>');
+           const objExpr = getComponent().objExpr;
 
-            objExpr !['bar'] = true;
-            detectChangesAndExpectClassName('init foo bar');
+           objExpr !['bar'] = true;
+           detectChangesAndExpectClassName('init foo bar');
 
-            objExpr !['foo'] = false;
-            detectChangesAndExpectClassName('init bar');
+           objExpr !['foo'] = false;
+           detectChangesAndExpectClassName('init bar');
 
-            getComponent().objExpr = null;
-            detectChangesAndExpectClassName('init foo');
-          }));
+           getComponent().objExpr = null;
+           detectChangesAndExpectClassName('init foo');
+         }));
 
       it('should co-operate with the interpolated class attribute', async(() => {
            fixture = createTestComponent(`<div [ngClass]="objExpr" class="{{'init foo'}}"></div>`);
@@ -351,6 +351,31 @@ import {ComponentFixture, TestBed, async} from '@angular/core/testing';
            cmp.objExpr = null;
            detectChangesAndExpectClassName('init baz');
          }));
+    });
+
+    describe('non-regression', () => {
+
+      it('should allow classes with trailing and leading spaces in [ngClass]', () => {
+        @Component({
+          template: `
+            <div leading-space [ngClass]="{' foo': applyClasses}"></div>
+            <div trailing-space [ngClass]="{'foo ': applyClasses}"></div>
+          `
+        })
+        class Cmp {
+          applyClasses = true;
+        }
+
+        TestBed.configureTestingModule({declarations: [Cmp]});
+        const fixture = TestBed.createComponent(Cmp);
+        fixture.detectChanges();
+
+        const leading = fixture.nativeElement.querySelector('[leading-space]');
+        const trailing = fixture.nativeElement.querySelector('[trailing-space]');
+        expect(leading.className).toBe('foo');
+        expect(trailing.className).toBe('foo');
+      });
+
     });
   });
 }

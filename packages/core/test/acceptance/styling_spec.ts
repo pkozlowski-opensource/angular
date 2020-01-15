@@ -483,10 +483,7 @@ describe('styling', () => {
     }
 
     TestBed.configureTestingModule({declarations: [MyApp, StyleDir]});
-    expect(() => {
-      const fixture = TestBed.createComponent(MyApp);
-      fixture.detectChanges();
-    }).not.toThrow();
+    TestBed.createComponent(MyApp).detectChanges();
   });
 
   it('should be able to bind a SafeValue to clip-path', () => {
@@ -2627,25 +2624,383 @@ describe('styling', () => {
     expect(getComputedStyle(div).width).toBe('10px');
   });
 
-  it('should allow classes with trailing and leading spaces in [ngClass]', () => {
+  it('should allow multiple styling bindings to work alongside property/attribute bindings', () => {
     @Component({
       template: `
-        <div leading-space [ngClass]="{' foo': applyClasses}"></div>
-        <div trailing-space [ngClass]="{'foo ': applyClasses}"></div>
-      `
+        <div 
+            dir-that-sets-styles
+            [style]="{'font-size': '300px'}"
+            [attr.title]="'my-title'"
+            [attr.data-foo]="'my-foo'">
+        </div>`
     })
-    class Cmp {
-      applyClasses = true;
+    class MyComp {
     }
 
-    TestBed.configureTestingModule({declarations: [Cmp]});
+    @Directive({selector: '[dir-that-sets-styles]'})
+    class DirThatSetsStyling {
+      @HostBinding('style.width') public w = '100px';
+      @HostBinding('style.height') public h = '200px';
+    }
+
+    const fixture = TestBed.configureTestingModule({declarations: [MyComp, DirThatSetsStyling]})
+                        .createComponent(MyComp);
+    fixture.detectChanges();
+    const div = fixture.nativeElement.querySelector('div') !;
+    expect(div.style.getPropertyValue('width')).toEqual('100px');
+    expect(div.style.getPropertyValue('height')).toEqual('200px');
+    expect(div.style.getPropertyValue('font-size')).toEqual('300px');
+    expect(div.getAttribute('title')).toEqual('my-title');
+    expect(div.getAttribute('data-foo')).toEqual('my-foo');
+  });
+
+  it('should allow host styling on the root element with external styling', () => {
+    @Component({template: '...'})
+    class MyComp {
+      @HostBinding('class') public classes = '';
+    }
+
+    const fixture =
+        TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(MyComp);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.className).toEqual('');
+
+    fixture.componentInstance.classes = '1 2 3';
+    fixture.detectChanges();
+    expect(root.className.split(/\s+/).sort().join(' ')).toEqual('1 2 3');
+
+    root.classList.add('0');
+    expect(root.className.split(/\s+/).sort().join(' ')).toEqual('0 1 2 3');
+
+    // TODO(pk): why ???
+    fixture.componentInstance.classes = '1 2 3 4';
+    fixture.detectChanges();
+    expect(root.className.split(/\s+/).sort().join(' ')).toEqual('0 1 2 3 4');
+  });
+
+  it('should apply camelCased class names', () => {
+    @Component({template: `<div [class]="'fooBar'" [class.barFoo]="true"></div>`})
+    class MyComp {
+    }
+
+    TestBed.configureTestingModule({
+      declarations: [MyComp],
+    });
+    const fixture = TestBed.createComponent(MyComp);
+    fixture.detectChanges();
+
+    const classList = (fixture.nativeElement.querySelector('div') as HTMLDivElement).classList;
+    expect(classList.contains('fooBar')).toBeTruthy();
+    expect(classList.contains('barFoo')).toBeTruthy();
+  });
+
+  it('should convert camelCased style property names to snake-case', () => {
+    @Component({template: `<div [style]="myStyles"></div>`})
+    class MyComp {
+      myStyles = {};
+    }
+
+    TestBed.configureTestingModule({
+      declarations: [MyComp],
+    });
+    const fixture = TestBed.createComponent(MyComp);
+    fixture.detectChanges();
+
+    const div = fixture.nativeElement.querySelector('div') as HTMLDivElement;
+    fixture.componentInstance.myStyles = {fontSize: '200px'};
+    fixture.detectChanges();
+
+    expect(div.style.getPropertyValue('font-size')).toEqual('200px');
+  });
+
+  it('should recover from an error thrown in styling bindings', () => {
+    let raiseWidthError = false;
+
+    @Component({template: `<div [style.width]="myWidth" [style.height]="'200px'"></div>`})
+    class MyComp {
+      get myWidth() {
+        if (raiseWidthError) {
+          throw new Error('...');
+        }
+        return '100px';
+      }
+    }
+
+    TestBed.configureTestingModule({declarations: [MyComp]});
+    const fixture = TestBed.createComponent(MyComp);
+
+    raiseWidthError = true;
+    expect(() => fixture.detectChanges()).toThrow();
+
+    raiseWidthError = false;
+    fixture.detectChanges();
+    const div = fixture.nativeElement.querySelector('div') as HTMLDivElement;
+    expect(div.style.getPropertyValue('width')).toEqual('100px');
+    expect(div.style.getPropertyValue('height')).toEqual('200px');
+  });
+
+  it('should prioritize host bindings for templates first, then directives and finally components',
+     () => {
+       @Component({selector: 'my-comp-with-styling', template: ''})
+       class MyCompWithStyling {
+         @HostBinding('style')
+         myStyles: any = {width: '300px'};
+
+         @HostBinding('style.height')
+         myHeight: any = '300px';
+       }
+
+       @Directive({selector: '[my-dir-with-styling]'})
+       class MyDirWithStyling {
+         @HostBinding('style')
+         myStyles: any = {width: '200px'};
+
+         @HostBinding('style.height')
+         myHeight: any = '200px';
+       }
+
+       @Component({
+         template: `
+          <my-comp-with-styling
+            style="height:1px; width:1px"
+            my-dir-with-styling
+            [style.height]="myHeight"
+            [style]="myStyles">
+          </my-comp-with-styling>
+      `
+       })
+       class MyComp {
+         myStyles: {width?: string} = {width: '100px'};
+         myHeight: string|null = '100px';
+
+         @ViewChild(MyDirWithStyling) dir !: MyDirWithStyling;
+         @ViewChild(MyCompWithStyling) comp !: MyCompWithStyling;
+       }
+
+       TestBed.configureTestingModule(
+           {declarations: [MyComp, MyCompWithStyling, MyDirWithStyling]});
+       const fixture = TestBed.createComponent(MyComp);
+       const comp = fixture.componentInstance;
+       const elm = fixture.nativeElement.querySelector('my-comp-with-styling') !;
+
+       fixture.detectChanges();
+       expect(elm.style.width).toEqual('100px');
+       expect(elm.style.height).toEqual('100px');
+
+       comp.myStyles = {};
+       comp.myHeight = null;
+       fixture.detectChanges();
+       expect(elm.style.width).toEqual('200px');
+       expect(elm.style.height).toEqual('200px');
+
+       comp.dir.myStyles = {};
+       comp.dir.myHeight = null;
+       fixture.detectChanges();
+       expect(elm.style.width).toEqual('300px');
+       expect(elm.style.height).toEqual('300px');
+
+       comp.comp.myStyles = {};
+       comp.comp.myHeight = null;
+       fixture.detectChanges();
+       expect(elm.style.width).toEqual('1px');
+       expect(elm.style.height).toEqual('1px');
+     });
+
+  it('should combine host class.foo bindings from multiple directives', () => {
+
+    @Directive({
+      selector: '[dir-that-sets-one-two]',
+      exportAs: 'one',
+    })
+    class DirThatSetsOneTwo {
+      @HostBinding('class.one') one = false;
+      @HostBinding('class.two') two = false;
+    }
+
+    @Directive({
+      selector: '[dir-that-sets-three-four]',
+      exportAs: 'two',
+    })
+    class DirThatSetsThreeFour {
+      @HostBinding('class.three') three = false;
+      @HostBinding('class.four') four = false;
+    }
+
+    @Component({
+      template: `
+           <div #div1
+             dir-that-sets-one-two
+             dir-that-sets-three-four></div>
+           <div #div2
+             [class.zero]="zero"
+             dir-that-sets-one-two
+             dir-that-sets-three-four></div>
+         `
+    })
+    class MyComp {
+      @ViewChild('div1', {static: true, read: DirThatSetsOneTwo})
+      public dirOneA: DirThatSetsOneTwo|null = null;
+
+      @ViewChild('div1', {static: true, read: DirThatSetsThreeFour})
+      public dirTwoA: DirThatSetsThreeFour|null = null;
+
+      @ViewChild('div2', {static: true, read: DirThatSetsOneTwo})
+      public dirOneB: DirThatSetsOneTwo|null = null;
+
+      @ViewChild('div2', {static: true, read: DirThatSetsThreeFour})
+      public dirTwoB: DirThatSetsThreeFour|null = null;
+
+      zero = false;
+    }
+
+    TestBed.configureTestingModule(
+        {declarations: [MyComp, DirThatSetsThreeFour, DirThatSetsOneTwo]});
+
+    const fixture = TestBed.createComponent(MyComp);
+    fixture.detectChanges();
+
+    const [div1, div2] = fixture.nativeElement.querySelectorAll('div') as HTMLDivElement[];
+
+    expect(div1.className).toBe('');
+    expect(div2.className).toBe('');
+
+    const comp = fixture.componentInstance;
+    comp.dirOneA !.one = comp.dirOneB !.one = true;
+    comp.dirOneA !.two = comp.dirOneB !.two = true;
+    fixture.detectChanges();
+
+    expect(div1.classList.contains('one')).toBeTruthy();
+    expect(div1.classList.contains('two')).toBeTruthy();
+    expect(div1.classList.contains('three')).toBeFalsy();
+    expect(div1.classList.contains('four')).toBeFalsy();
+    expect(div2.classList.contains('one')).toBeTruthy();
+    expect(div2.classList.contains('two')).toBeTruthy();
+    expect(div2.classList.contains('three')).toBeFalsy();
+    expect(div2.classList.contains('four')).toBeFalsy();
+    expect(div2.classList.contains('zero')).toBeFalsy();
+
+    comp.dirTwoA !.three = comp.dirTwoB !.three = true;
+    comp.dirTwoA !.four = comp.dirTwoB !.four = true;
+    fixture.detectChanges();
+
+    expect(div1.classList.contains('one')).toBeTruthy();
+    expect(div1.classList.contains('two')).toBeTruthy();
+    expect(div1.classList.contains('three')).toBeTruthy();
+    expect(div1.classList.contains('four')).toBeTruthy();
+    expect(div2.classList.contains('one')).toBeTruthy();
+    expect(div2.classList.contains('two')).toBeTruthy();
+    expect(div2.classList.contains('three')).toBeTruthy();
+    expect(div2.classList.contains('four')).toBeTruthy();
+    expect(div2.classList.contains('zero')).toBeFalsy();
+
+    comp.zero = true;
+    fixture.detectChanges();
+
+    expect(div1.classList.contains('one')).toBeTruthy();
+    expect(div1.classList.contains('two')).toBeTruthy();
+    expect(div1.classList.contains('three')).toBeTruthy();
+    expect(div1.classList.contains('four')).toBeTruthy();
+    expect(div2.classList.contains('one')).toBeTruthy();
+    expect(div2.classList.contains('two')).toBeTruthy();
+    expect(div2.classList.contains('three')).toBeTruthy();
+    expect(div2.classList.contains('four')).toBeTruthy();
+    expect(div2.classList.contains('zero')).toBeTruthy();
+  });
+
+  it('should combine static host classes with component "class" host attribute', () => {
+    @Component({selector: 'comp-with-classes', template: '', host: {'class': 'host'}})
+    class CompWithClasses {
+      constructor(ref: ElementRef) { ref.nativeElement.classList.add('custom'); }
+    }
+
+    @Component({
+      template: `<comp-with-classes class="inline" *ngFor="let item of items"></comp-with-classes>`
+    })
+    class MyComp {
+      items = [1, 2, 3];
+    }
+
+    const fixture = TestBed
+                        .configureTestingModule({
+                          declarations: [MyComp, CompWithClasses],
+                        })
+                        .createComponent(MyComp);
+    fixture.detectChanges();
+
+    const [one, two, three] =
+        fixture.nativeElement.querySelectorAll('comp-with-classes') as HTMLDivElement[];
+
+    expect(one.classList.contains('custom')).toBeTruthy();
+    expect(one.classList.contains('inline')).toBeTruthy();
+    expect(one.classList.contains('host')).toBeTruthy();
+
+    expect(two.classList.contains('custom')).toBeTruthy();
+    expect(two.classList.contains('inline')).toBeTruthy();
+    expect(two.classList.contains('host')).toBeTruthy();
+
+    expect(three.classList.contains('custom')).toBeTruthy();
+    expect(three.classList.contains('inline')).toBeTruthy();
+    expect(three.classList.contains('host')).toBeTruthy();
+  });
+
+  it('should allow a single style host binding on an element', () => {
+    @Component({template: `<div single-host-style-dir></div>`})
+    class Cmp {
+    }
+
+    @Directive({selector: '[single-host-style-dir]'})
+    class SingleHostStyleDir {
+      @HostBinding('style.width')
+      width = '100px';
+    }
+
+    TestBed.configureTestingModule({declarations: [Cmp, SingleHostStyleDir]});
     const fixture = TestBed.createComponent(Cmp);
     fixture.detectChanges();
 
-    const leading = fixture.nativeElement.querySelector('[leading-space]');
-    const trailing = fixture.nativeElement.querySelector('[trailing-space]');
-    expect(leading.className).toBe('foo', 'Expected class to be applied despite leading space.');
-    expect(trailing.className).toBe('foo', 'Expected class to be applied despite trailing space.');
+    const element = fixture.nativeElement.querySelector('div');
+    expect(element.style.width).toEqual('100px');
+  });
+
+  it('should override class bindings when a directive extends another directive', () => {
+    @Component({template: `<child-comp class="template"></child-comp>`})
+    class Cmp {
+    }
+
+    @Component({
+      selector: 'parent-comp',
+      host: {'class': 'parent-comp', '[class.parent-comp-active]': 'true'},
+      template: '...',
+    })
+    class ParentComp {
+    }
+
+    @Component({
+      selector: 'child-comp',
+      host: {
+        'class': 'child-comp',
+        '[class.child-comp-active]': 'true',
+        '[class.parent-comp]': 'false',
+        '[class.parent-comp-active]': 'false'
+      },
+      template: '...',
+    })
+    class ChildComp extends ParentComp {
+    }
+
+    TestBed.configureTestingModule({declarations: [Cmp, ChildComp, ParentComp]});
+    const fixture = TestBed.createComponent(Cmp);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement.querySelector('child-comp');
+    expect(element.classList.contains('template')).toBeTruthy();
+
+    expect(element.classList.contains('child-comp')).toBeTruthy();
+    expect(element.classList.contains('child-comp-active')).toBeTruthy();
+
+    expect(element.classList.contains('parent-comp')).toBeFalsy();
+    expect(element.classList.contains('parent-comp-active')).toBeFalsy();
   });
 
   // TODO(FW-1360): re-enable this test once the new styling changes are in place.
