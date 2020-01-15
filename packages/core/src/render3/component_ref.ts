@@ -133,9 +133,10 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
         rootViewInjector.get(RendererFactory2, domRendererFactory3) as RendererFactory3;
     const sanitizer = rootViewInjector.get(Sanitizer, null);
 
+    const hostRenderer = rendererFactory.createRenderer(null, this.componentDef);
     const hostRNode = rootSelectorOrNode ?
         locateHostElement(rendererFactory, rootSelectorOrNode, this.componentDef.encapsulation) :
-        elementCreate(this.selector, rendererFactory.createRenderer(null, this.componentDef), null);
+        elementCreate(this.selector, hostRenderer, null);
 
     const rootFlags = this.componentDef.onPush ? LViewFlags.Dirty | LViewFlags.IsRoot :
                                                  LViewFlags.CheckAlways | LViewFlags.IsRoot;
@@ -148,20 +149,19 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
         /^#root-ng-internal-isolated-\d+/.test(rootSelectorOrNode);
 
     const rootContext = createRootContext();
-    const renderer = rendererFactory.createRenderer(hostRNode, this.componentDef);
 
     if (rootSelectorOrNode && hostRNode) {
       ngDevMode && ngDevMode.rendererSetAttribute++;
-      isProceduralRenderer(renderer) ?
-          renderer.setAttribute(hostRNode, 'ng-version', VERSION.full) :
+      isProceduralRenderer(hostRenderer) ?
+          hostRenderer.setAttribute(hostRNode, 'ng-version', VERSION.full) :
           hostRNode.setAttribute('ng-version', VERSION.full);
     }
 
     // Create the root view. Uses empty TView and ContentTemplate.
     const rootTView = createTView(TViewType.Root, -1, null, 1, 0, null, null, null, null, null);
     const rootLView = createLView(
-        null, rootTView, rootContext, rootFlags, null, null, rendererFactory, renderer, sanitizer,
-        rootViewInjector);
+        null, rootTView, rootContext, rootFlags, null, null, rendererFactory, hostRenderer,
+        sanitizer, rootViewInjector);
 
     // rootView is the parent when bootstrapping
     // TODO(misko): it looks like we are entering view here but we don't really need to as
@@ -175,7 +175,7 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
 
     try {
       const componentView = createRootComponentView(
-          hostRNode, this.componentDef, rootLView, rendererFactory, renderer);
+          hostRNode, this.componentDef, rootLView, rendererFactory, hostRenderer);
 
       tElementNode = getTNode(0, rootLView) as TElementNode;
 

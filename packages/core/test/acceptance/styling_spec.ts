@@ -210,7 +210,11 @@ describe('styling', () => {
 
     const [div1, div2] = fixture.nativeElement.querySelectorAll('div');
     expect(div1.className).toEqual('s1');
-    expect(div1.getAttribute('shadow-class')).toEqual('d1');
+    // VE has weird behavior where it calls the @Input('class') with either `class="static` ol
+    // `[class]="dynamic"` but never both. This is determined at compile time. Due to locality we
+    // don't know if `[class]` is coming if we see `class` only. So we need to combine the two
+    // This results in slightly different calling sequence, but should result in the same final DOM.
+    expect(div1.getAttribute('shadow-class')).toEqual(ivyEnabled ? 's1 d1' : 'd1');
 
     expect(div2.className).toEqual('');
     expect(div2.getAttribute('shadow-class')).toEqual('s2 d2');
@@ -848,7 +852,7 @@ describe('styling', () => {
         TestBed.configureTestingModule({declarations: [Comp, App]});
         const fixture = TestBed.createComponent(App);
         fixture.detectChanges();
-        expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('my-className');
+        expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('static my-className');
       });
 
   onlyInIvy('in Ivy [class] and [className] bindings on the same element are not allowed')
@@ -932,7 +936,7 @@ describe('styling', () => {
             fixture.detectChanges();
 
             expect(capturedClassBindingCount).toEqual(1);
-            expect(capturedClassBindingValue !).toEqual('dynamic-val');
+            expect(capturedClassBindingValue !).toEqual('static-val dynamic-val');
             expect(capturedMyClassBindingCount).toEqual(1);
             expect(capturedMyClassBindingValue !).toEqual('foo');
           });

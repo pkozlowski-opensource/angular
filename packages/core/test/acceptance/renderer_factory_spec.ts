@@ -72,7 +72,7 @@ describe('renderer factory lifecycle', () => {
     const fixture = TestBed.createComponent(SomeComponent);
     fixture.detectChanges();
     expect(logs).toEqual(
-        ['create', 'create', 'begin', 'some_component create', 'some_component update', 'end']);
+        ['create', 'begin', 'some_component create', 'some_component update', 'end']);
 
     logs = [];
     fixture.detectChanges();
@@ -85,7 +85,7 @@ describe('renderer factory lifecycle', () => {
           const fixture = TestBed.createComponent(SomeComponentWhichThrows);
           fixture.detectChanges();
         }).toThrow();
-        expect(logs).toEqual(['create', 'create', 'begin', 'end']);
+        expect(logs).toEqual(['create', 'begin', 'end']);
       });
 });
 

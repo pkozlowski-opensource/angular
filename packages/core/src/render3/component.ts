@@ -161,14 +161,15 @@ export function renderComponent<T>(
  * @param rNode Render host element.
  * @param def ComponentDef
  * @param rootView The parent view where the host node is stored
- * @param renderer The current renderer
+ * @param hostRenderer The current renderer
  * @param sanitizer The sanitizer, if provided
  *
  * @returns Component view created
  */
 export function createRootComponentView(
     rNode: RElement | null, def: ComponentDef<any>, rootView: LView,
-    rendererFactory: RendererFactory3, renderer: Renderer3, sanitizer?: Sanitizer | null): LView {
+    rendererFactory: RendererFactory3, hostRenderer: Renderer3,
+    sanitizer?: Sanitizer | null): LView {
   const tView = rootView[TVIEW];
   ngDevMode && assertDataInRange(rootView, 0 + HEADER_OFFSET);
   rootView[0 + HEADER_OFFSET] = rNode;
@@ -177,19 +178,20 @@ export function createRootComponentView(
   if (mergedAttrs !== null) {
     computeStaticStyling(tNode, mergedAttrs);
     if (rNode !== null) {
-      setUpAttributes(renderer, rNode, mergedAttrs);
+      setUpAttributes(hostRenderer, rNode, mergedAttrs);
       if (tNode.classes !== null) {
-        writeDirectClass(renderer, rNode, tNode.classes);
+        writeDirectClass(hostRenderer, rNode, tNode.classes);
       }
       if (tNode.styles !== null) {
-        writeDirectStyle(renderer, rNode, tNode.styles);
+        writeDirectStyle(hostRenderer, rNode, tNode.styles);
       }
     }
   }
+  const viewRenderer = rendererFactory.createRenderer(rNode, def);
   const componentView = createLView(
       rootView, getOrCreateTComponentView(def), null,
       def.onPush ? LViewFlags.Dirty : LViewFlags.CheckAlways, rootView[HEADER_OFFSET], tNode,
-      rendererFactory, renderer, sanitizer);
+      rendererFactory, viewRenderer, sanitizer);
 
   if (tView.firstCreatePass) {
     diPublicInInjector(getOrCreateNodeInjectorForNode(tNode, rootView), tView, def.type);
@@ -237,15 +239,6 @@ export function createRootComponent<T>(
 
     invokeHostBindingsInCreationMode(componentDef, component, rootTNode);
   }
-  const renderer = rootLView[RENDERER];
-  const native = getNativeByTNode(rootTNode, rootLView) as RElement;
-  if (rootTNode.classes) {
-    writeDirectClass(renderer, native, rootTNode.classes);
-  }
-  if (rootTNode.styles) {
-    writeDirectStyle(renderer, native, rootTNode.styles);
-  }
-
   return component;
 }
 

@@ -200,7 +200,9 @@ export function checkStylingMap(
       if (isClassBased === false && staticPrefix !== null && !staticPrefix.endsWith(';')) {
         staticPrefix += ';';
       }
-      value = concatStringsWithSpace(staticPrefix, value as string);
+      if (typeof value === 'string') {
+        value = concatStringsWithSpace(staticPrefix, value as string);
+      }
       // Given `<div [style] my-dir>` such that `my-dir` has `@Input('style')`.
       // This takes over the `[style]` binding. (Same for `[class]`)
       setDirectiveInputsWhichShadowsStyling(tNode, lView, value, isClassBased);
