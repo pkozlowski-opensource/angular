@@ -1033,7 +1033,7 @@ describe('acceptance integration tests', () => {
 
         fixture.componentInstance.value = false;
         fixture.detectChanges();
-        expect(structuralCompEl.getAttribute('class')).toEqual('');
+        expect(structuralCompEl.getAttribute('class')).toBeFalsy();
       });
 
       @Directive({selector: '[DirWithClass]'})
@@ -1123,7 +1123,7 @@ describe('acceptance integration tests', () => {
                 fixture.detectChanges();
 
                 expect(fixture.componentInstance.mockStyleDirective.stylesVal)
-                    .toEqual('width: 200px; height: 500px;');
+                    .toEqual({width: '200px', height: '500px'});
               });
 
       onlyInIvy('Style binding merging works differently in Ivy')

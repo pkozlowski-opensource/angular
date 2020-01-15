@@ -69,7 +69,13 @@ export function writeAndReconcileClass(
 export function writeDirectClass(renderer: Renderer3, element: RElement, newValue: string) {
   ngDevMode && assertString(newValue, '\'newValue\' should be a string');
   if (isProceduralRenderer(renderer)) {
-    renderer.setAttribute(element, 'class', newValue);
+    if (newValue === '') {
+      // There are tests in `google3` which expect `element.getAttribute('class')` to be `null`.
+      // TODO(commit): add test case
+      renderer.removeAttribute(element, 'class');
+    } else {
+      renderer.setAttribute(element, 'class', newValue);
+    }
   } else {
     element.className = newValue;
   }

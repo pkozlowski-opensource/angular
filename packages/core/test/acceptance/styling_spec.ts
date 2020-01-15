@@ -210,13 +210,7 @@ describe('styling', () => {
 
     const [div1, div2] = fixture.nativeElement.querySelectorAll('div');
     expect(div1.className).toEqual('s1');
-    expect(div1.getAttribute('shadow-class'))
-        .toEqual(
-            ivyEnabled ?
-                // IVY - merges all styles into one. This means that static/dynamic things merge
-                's1 d1' :
-                // VE - does not merge anything. It gets binding only.
-                'd1');
+    expect(div1.getAttribute('shadow-class')).toEqual('d1');
 
     expect(div2.className).toEqual('');
     expect(div2.getAttribute('shadow-class')).toEqual('s2 d2');
@@ -710,26 +704,13 @@ describe('styling', () => {
            capturedMyClassBindingValue = v;
          }
        }
-       // This is a slightly different behavior between Ivy and VE.
-       // Given: `<div style-class-capture-dir [style]="styleExp" [class]="classExp">`
-       // and `class StyleClassCaptureDir {@Input() class; @Input() style; }`
-       // What should the `StyleClassCaptureDir` receive in the `class` and `style` input?
-       // In VE the directive receives whatever was bound in `styleExp` and `classExp`.
-       // In Ivy this is more complicated since Ivy merges multiple bindings into a single one.
-       // So in case of Ivy you could have an array, string and object literal bound to `class` and
-       // `style` and Ivy needs to merge it into single value and than give it to the directive.
-       // The question is in what format should the value be? Here it makes no sense to just pass
-       // through the value as in VE, because there could be a merge between string and array.
-       // So for consistency Ivy always passes the style as string. This makes sense because of the
-       // base case: `<div style-class-capture-dir style="color: red" class="my-class">` is string.
-       const emptyValue = ivyEnabled ? '' : null;
 
        TestBed.configureTestingModule({declarations: [Cmp, MyClassDir]});
        const fixture = TestBed.createComponent(Cmp);
        fixture.detectChanges();
 
        expect(capturedClassBindingCount).toEqual(1);
-       expect(capturedClassBindingValue as any).toEqual(emptyValue);
+       expect(capturedClassBindingValue as any).toEqual(null);
        expect(capturedMyClassBindingCount).toEqual(1);
        expect(capturedMyClassBindingValue !).toEqual('foo');
 
@@ -745,7 +726,7 @@ describe('styling', () => {
        fixture.detectChanges();
 
        expect(capturedClassBindingCount).toEqual(3);
-       expect(capturedClassBindingValue as any).toEqual(emptyValue);
+       expect(capturedClassBindingValue as any).toEqual(null);
        expect(capturedMyClassBindingCount).toEqual(1);
        expect(capturedMyClassBindingValue !).toEqual('foo');
 
@@ -867,7 +848,7 @@ describe('styling', () => {
         TestBed.configureTestingModule({declarations: [Comp, App]});
         const fixture = TestBed.createComponent(App);
         fixture.detectChanges();
-        expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('static my-className');
+        expect(fixture.debugElement.nativeElement.firstChild.innerHTML).toBe('my-className');
       });
 
   onlyInIvy('in Ivy [class] and [className] bindings on the same element are not allowed')
@@ -942,7 +923,7 @@ describe('styling', () => {
                     // instruction. We don't think this is worth it, and we are just going to live
                     // with this.
                     );
-            expect(capturedClassBindingValue !).toEqual('static-val');
+            expect(capturedClassBindingValue).toEqual(null);
             expect(capturedMyClassBindingCount).toEqual(1);
             expect(capturedMyClassBindingValue !).toEqual('foo');
 
@@ -951,7 +932,7 @@ describe('styling', () => {
             fixture.detectChanges();
 
             expect(capturedClassBindingCount).toEqual(1);
-            expect(capturedClassBindingValue !).toEqual('static-val dynamic-val');
+            expect(capturedClassBindingValue !).toEqual('dynamic-val');
             expect(capturedMyClassBindingCount).toEqual(1);
             expect(capturedMyClassBindingValue !).toEqual('foo');
           });

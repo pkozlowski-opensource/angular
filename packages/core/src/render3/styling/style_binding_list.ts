@@ -586,3 +586,14 @@ export const STYLE_MAP_STYLING_KEY: TStylingMapKey = {
     return text;
   }
 };
+
+
+/**
+ * If we have `<div [class] my-dir>` such that `my-dir` has `@Input('class')`, the `my-dir` captures
+ * the `[class]` binding, so that it no longer participates in the style bindings. For this case
+ * we use `IGNORE_DO_TO_INPUT_SHADOW` so that `flushStyleBinding` ignores it.
+ */
+export const IGNORE_DUE_TO_INPUT_SHADOW: TStylingMapKey = {
+  key: null,
+  extra: (text: string, value: any, hasPreviousDuplicate: boolean): string => { return text;}
+};

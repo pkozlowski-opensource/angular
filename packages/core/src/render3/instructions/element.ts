@@ -88,11 +88,13 @@ export function ɵɵelementStart(
   if (mergedAttrs !== null) {
     setUpAttributes(renderer, native, mergedAttrs);
   }
-  if (tNode.classes) {
-    writeDirectClass(renderer, native, tNode.classes);
+  const classes = tNode.classes;
+  if (classes) {
+    writeDirectClass(renderer, native, classes);
   }
-  if (tNode.styles) {
-    writeDirectStyle(renderer, native, tNode.styles);
+  const styles = tNode.styles;
+  if (styles) {
+    writeDirectStyle(renderer, native, styles);
   }
 
   appendChild(native, tNode, lView);

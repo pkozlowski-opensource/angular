@@ -8,6 +8,7 @@
 import {SafeValue} from '../../sanitization/bypass';
 import {StyleSanitizeFn} from '../../sanitization/style_sanitizer';
 import {assertEqual, assertGreaterThan, assertLessThan} from '../../util/assert';
+import {concatStringsWithSpace} from '../../util/stringify';
 import {assertFirstUpdatePass} from '../assert';
 import {bindingUpdated} from '../bindings';
 import {TNode, TNodeFlags, TNodeType} from '../interfaces/node';
@@ -17,9 +18,10 @@ import {TStylingKey, TStylingMapKey, TStylingSanitizationKey, TStylingSuffixKey,
 import {HEADER_OFFSET, RENDERER, TVIEW, TView} from '../interfaces/view';
 import {getCheckNoChangesMode, getClassBindingChanged, getCurrentStyleSanitizer, getLView, getSelectedIndex, getStyleBindingChanged, incrementBindingIndex, isActiveHostElement, markStylingBindingDirty, setCurrentStyleSanitizer, setElementExitFn} from '../state';
 import {writeAndReconcileClass, writeAndReconcileStyle} from '../styling/reconcile';
-import {CLASS_MAP_STYLING_KEY, STYLE_MAP_STYLING_KEY, flushStyleBinding, insertTStylingBinding} from '../styling/style_binding_list';
+import {CLASS_MAP_STYLING_KEY, IGNORE_DUE_TO_INPUT_SHADOW, STYLE_MAP_STYLING_KEY, flushStyleBinding, insertTStylingBinding} from '../styling/style_binding_list';
 import {NO_CHANGE} from '../tokens';
 import {unwrapRNode} from '../util/view_utils';
+
 import {setDirectiveInputsWhichShadowsStyling} from './property';
 
 
@@ -190,9 +192,23 @@ export function checkStylingMap(
     stylingPropertyFirstUpdatePass(tView, tStylingMapKey, null, bindingIndex, isClassBased);
   }
   if (value !== NO_CHANGE && bindingUpdated(lView, bindingIndex, value)) {
-    lView[bindingIndex] = value;
-    markStylingBindingDirty(bindingIndex, isClassBased);
-    setElementExitFn(flushStylingOnElementExit);
+    const tNode = tView.data[getSelectedIndex() + HEADER_OFFSET] as TNode;
+    if (hasStylingInputShadow(tNode, isClassBased)) {
+      // VE concatenates the static portion with the dynamic portion.
+      // We are doing the same.
+      let staticPrefix = isClassBased ? tNode.classes : tNode.styles;
+      if (isClassBased === false && staticPrefix !== null && !staticPrefix.endsWith(';')) {
+        staticPrefix += ';';
+      }
+      value = concatStringsWithSpace(staticPrefix, value as string);
+      // Given `<div [style] my-dir>` such that `my-dir` has `@Input('style')`.
+      // This takes over the `[style]` binding. (Same for `[class]`)
+      setDirectiveInputsWhichShadowsStyling(tNode, lView, value, isClassBased);
+    } else {
+      lView[bindingIndex] = value;
+      markStylingBindingDirty(bindingIndex, isClassBased);
+      setElementExitFn(flushStylingOnElementExit);
+    }
   }
 }
 
@@ -223,12 +239,33 @@ function stylingPropertyFirstUpdatePass(
     // (ne exception) template execution. This prevents the styling instruction from double adding
     // itself to the list.
     const tNode = tData[getSelectedIndex() + HEADER_OFFSET] as TNode;
+    if (hasStylingInputShadow(tNode, isClassBased) && typeof prop === 'object') {
+      // typeof prop === 'object' implies that we are either `STYLE_MAP_STYLING_KEY` or
+      // `CLASS_MAP_STYLING_KEY` which means that we are either `[style]` or `[class]` binding.
+      // If there is a directive which uses `@Input('style')` or `@Input('class')` than
+      // we need to neutralize this binding since that directive is shadowing it.
+      // We turn this into a noop using `IGNORE_DOE_TO_INPUT_SHADOW`
+      prop = IGNORE_DUE_TO_INPUT_SHADOW;
+    }
     const tStylingKey: TStylingKey = suffixOrSanitization == null ? prop : ({
       key: prop as string, extra: suffixOrSanitization
     } as TStylingSuffixKey | TStylingSanitizationKey);
     insertTStylingBinding(
         tData, tNode, tStylingKey, bindingIndex, isActiveHostElement(), isClassBased);
   }
+}
+
+/**
+ * Tests if the `TNode` has input shadow.
+ *
+ * An input shadow is when a directive steals (shadows) the input by using `@Input('style')` or
+ * `@Input('class')` as input.
+ *
+ * @param tNode `TNode` which we would like to see if it has shadow.
+* @param isClassBased `true` if `class` (`false` if `style`)
+ */
+export function hasStylingInputShadow(tNode: TNode, isClassBased: boolean) {
+  return (tNode.flags & (isClassBased ? TNodeFlags.hasClassInput : TNodeFlags.hasStyleInput)) !== 0;
 }
 
 /**
@@ -269,11 +306,7 @@ function flushStylingOnElementExit() {
         assertLessThan(classLastWrittenValueIndex, lView.length, 'Reading past end of LView');
     const lastValue: string|NO_CHANGE = lView[classLastWrittenValueIndex];
     const newValue = flushStyleBinding(tData, tNode, lView, classBindingIndex, true);
-    if ((tNode.flags & TNodeFlags.hasClassInput) != 0) {
-      // Given `<div [class] my-dir>` such that `my-dir` has `@Input('class')`.
-      // This takes over the `[class]` binding.
-      setDirectiveInputsWhichShadowsStyling(tNode, lView, newValue, true);
-    } else if (lastValue !== newValue) {
+    if (lastValue !== newValue) {
       if (tNode.type === TNodeType.Element) {
         writeAndReconcileClass(
             renderer, element, lastValue === NO_CHANGE ? tNode.classes || '' : lastValue as string,
@@ -295,11 +328,7 @@ function flushStylingOnElementExit() {
         assertLessThan(styleLastWrittenValueIndex, lView.length, 'Reading past end of LView');
     const lastValue: string|NO_CHANGE = lView[styleLastWrittenValueIndex];
     const newValue = flushStyleBinding(tData, tNode, lView, styleBindingIndex, false);
-    if ((tNode.flags & TNodeFlags.hasStyleInput) != 0) {
-      // Given `<div [style] my-dir>` such that `my-dir` has `@Input('style')`.
-      // This takes over the `[style]` binding.
-      setDirectiveInputsWhichShadowsStyling(tNode, lView, newValue, false);
-    } else if (lastValue !== newValue) {
+    if (lastValue !== newValue) {
       if (tNode.type === TNodeType.Element) {
         writeAndReconcileStyle(
             renderer, element, lastValue === NO_CHANGE ? tNode.styles || '' : lastValue as string,
