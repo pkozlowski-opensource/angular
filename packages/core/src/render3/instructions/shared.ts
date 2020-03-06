@@ -825,8 +825,10 @@ export function createTNode(
                          tParent,    // parent: TElementNode|TContainerNode|null
                          null,       // projection: number|(ITNode|RNode[])[]|null
                          null,       // styles: string|null
+                         null,       // stylesNoHost: string|null
                          undefined,  // residualStyles: string|null
                          null,       // classes: string|null
+                         null,       // classesNoHost: string|null
                          undefined,  // residualClasses: string|null
                          0 as any,   // classBindings: TStylingRange;
                          0 as any,   // styleBindings: TStylingRange;
@@ -855,8 +857,10 @@ export function createTNode(
                        parent: tParent,
                        projection: null,
                        styles: null,
+                       stylesNoHost: null,
                        residualStyles: undefined,
                        classes: null,
+                       classesNoHost: null,
                        residualClasses: undefined,
                        classBindings: 0 as any,
                        styleBindings: 0 as any,
