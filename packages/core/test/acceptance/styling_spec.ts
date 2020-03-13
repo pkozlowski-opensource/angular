@@ -316,6 +316,61 @@ describe('styling', () => {
         expect(div2.getAttribute('shadow-class')).toEqual('s2 d2');
       });
 
+  it('should capture GH scenario', () => {
+    @Component({
+      selector: 'with-class-host-and-input',
+      template: `{{klass}}`,
+      host: {class: 'host'},
+    })
+    class WithClassHostBindingAndInput {
+      @Input('class') klass = '';
+    }
+
+    @Component({
+      selector: 'test-app',
+      template: `<with-class-host-and-input class="static"></with-class-host-and-input>`,
+    })
+    class TestApp {
+    }
+
+    TestBed.configureTestingModule({declarations: [WithClassHostBindingAndInput, TestApp]});
+    const fixture = TestBed.createComponent(TestApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toBe('static');
+    expectClass(fixture.debugElement.children[0].nativeElement)
+        .toEqual({'host': true, 'static': true});
+  });
+
+  it('should capture more complex GH scenario', () => {
+    @Component({
+      selector: 'with-class-host-and-input',
+      template: `{{klass}}`,
+      host: {class: 'host'},
+    })
+    class WithClassHostBindingAndInput {
+      @Input('class') klass = '';
+    }
+
+    @Component({
+      selector: 'test-app',
+      template: `
+        <with-class-host-and-input 
+          class="static" [class]="'dynamic'">
+        </with-class-host-and-input>`,
+    })
+    class TestApp {
+    }
+
+    TestBed.configureTestingModule({declarations: [WithClassHostBindingAndInput, TestApp]});
+    const fixture = TestBed.createComponent(TestApp);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toBe('static dynamic');
+    expectClass(fixture.debugElement.children[0].nativeElement)
+        .toEqual({'host': true, 'static': true, 'dynamic': true});
+  });
+
   it('should not feed host class back into shadow input', () => {
     @Component({
       template: `
@@ -466,7 +521,8 @@ describe('styling', () => {
         // `[class]="dynamic"` but never both. This is determined at compile time. Due to locality
         // we
         // don't know if `[class]` is coming if we see `class` only. So we need to combine the two
-        // This results in slightly different calling sequence, but should result in the same final
+        // This results in slightly different calling sequence, but should result in the same
+        // final
         // DOM.
         expect(div.getAttribute('shadow-style')).toEqual('width: 100px;');
       });
@@ -501,7 +557,8 @@ describe('styling', () => {
         // `[class]="dynamic"` but never both. This is determined at compile time. Due to locality
         // we
         // don't know if `[class]` is coming if we see `class` only. So we need to combine the two
-        // This results in slightly different calling sequence, but should result in the same final
+        // This results in slightly different calling sequence, but should result in the same
+        // final
         // DOM.
         expect(div.getAttribute('shadow-style')).toEqual('color: red; width: 100px;');
       });
@@ -779,7 +836,8 @@ describe('styling', () => {
 
   it('should not write to the native element if a directive shadows the class input', () => {
     // This ex is a bit contrived. In real apps, you might have a shared class that is extended
-    // both by components with host elements and by directives on template nodes. In that case, the
+    // both by components with host elements and by directives on template nodes. In that case,
+    // the
     // host styles for the template directives should just be ignored.
     @Directive({selector: 'ng-template[styleDir]', host: {'[style.display]': 'display'}})
     class StyleDir {
@@ -1264,7 +1322,8 @@ describe('styling', () => {
                     // `class="static-val"` and one for `[class]="c"`. This means that
                     // `class="static-val"` is written during the create block which is not ideal.
                     // To do this correctly we would have to delay the `class="static-val"` until
-                    // the update block, but that would be expensive since it would require that we
+                    // the update block, but that would be expensive since it would require that
+                    // we
                     // would check if we possibly have this situation on every `advance()`
                     // instruction. We don't think this is worth it, and we are just going to live
                     // with this.
@@ -3435,7 +3494,8 @@ describe('styling', () => {
       if (!ivyEnabled && !supportsWritingStringsToStyleProperty()) {
         // VE does not treat `[style]` as anything special, instead it simply writes to the
         // `style` property on the element like so `element.style=value`. This seems to work fine
-        // every where except ie10, where it throws an error and as a consequence this test fails in
+        // every where except ie10, where it throws an error and as a consequence this test fails
+        // in
         // VE on ie10.
         return;
       }
@@ -3506,7 +3566,8 @@ describe('styling', () => {
           @Component({template: `<my-cmp *ngFor="let i of [1,2]" host-styling></my-cmp>`})
           class MyApp {
             // When the first view in the list gets CD-ed, everything works.
-            // When the second view gets CD-ed, the styling has already created the data structures
+            // When the second view gets CD-ed, the styling has already created the data
+            // structures
             // in the `TView`. As a result when `[class.foo]` runs it already knows that `[class]`
             // is a duplicate and hence it can overwrite the `[class.foo]` binding. While the
             // styling resolution is happening the algorithm  reads the value of the `[class]`
