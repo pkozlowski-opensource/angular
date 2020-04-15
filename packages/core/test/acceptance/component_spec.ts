@@ -7,7 +7,7 @@
  */
 
 import {DOCUMENT} from '@angular/common';
-import {Component, ComponentFactoryResolver, ComponentRef, ElementRef, InjectionToken, Injector, Input, NgModule, OnDestroy, Renderer2, RendererFactory2, Type, ViewChild, ViewContainerRef, ViewEncapsulation, ɵsetDocument} from '@angular/core';
+import {Component, ComponentFactoryResolver, ComponentRef, Directive, ElementRef, InjectionToken, Injector, Input, NgModule, OnDestroy, Renderer2, RendererFactory2, Type, ViewChild, ViewContainerRef, ViewEncapsulation, ɵsetDocument} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 import {ɵDomRendererFactory2 as DomRendererFactory2} from '@angular/platform-browser';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
@@ -465,5 +465,119 @@ describe('component', () => {
         .it('with Renderer3',
             () =>
                 runTestWithRenderer([{provide: RendererFactory2, useValue: domRendererFactory3}]));
+  });
+
+  fdescribe('create mode error handling', () => {
+    // Investigation / research:
+    // - "recursion"
+    // - is there a way of running change detection on a "broken" view?
+    // -- probably not, at least in VE nothing happens:
+    // https://stackblitz.com/edit/angular-urmrw7?file=src%2Fapp%2Fapp.component.ts
+
+    // Open questions:
+    // - what should happen in the UI when creation mode fails?
+    // -- VE will render a view partially (up to the point where it failed):
+    // https://stackblitz.com/edit/angular-urmrw7?file=src/app/app.module.ts
+    // -- how could we reproduce the above situation under test?
+    // -- do we want to have VE behavior?
+    // - how should we report such errors to a user?
+
+    it('should consistently report errors raised a directive constructor', () => {
+      @Directive({
+        selector: '[failInConstructorAlways]',
+      })
+      class FailInConstructorAlways {
+        constructor() {
+          throw new Error('Error in a constructor');
+        }
+      }
+
+      @Component({
+        selector: 'test',
+        template: `<div failInConstructorAlways></div>`,
+      })
+      class TestCmpt {
+      }
+
+      TestBed.configureTestingModule({
+        declarations: [TestCmpt, FailInConstructorAlways],
+      });
+
+      expect(() => {
+        TestBed.createComponent(TestCmpt);
+      }).toThrowError('Error in a constructor');
+
+      expect(() => {
+        TestBed.createComponent(TestCmpt);
+      }).toThrowError('Error in a constructor');
+    });
+
+    it('should render even if a directive constructor throws in the first create pass', () => {
+      let firstRun = true;
+
+      @Directive({
+        selector: '[failInConstructorOnce]',
+      })
+      class FailInConstructorOnce {
+        constructor() {
+          if (firstRun) {
+            firstRun = false;
+            throw new Error('Error in a constructor');
+          }
+        }
+      }
+
+      @Component({
+        selector: 'test',
+        template: `<div failInConstructorOnce>OK</div>`,
+      })
+      class TestCmpt {
+      }
+
+      TestBed.configureTestingModule({
+        declarations: [TestCmpt, FailInConstructorOnce],
+      });
+
+      expect(() => {
+        TestBed.createComponent(TestCmpt);
+      }).toThrowError('Error in a constructor');
+
+      const fixture = TestBed.createComponent(TestCmpt);
+      expect(fixture.debugElement.nativeElement).toHaveText('OK');
+    });
+
+    it('should consistently report errors raised a directive input setter', () => {
+      @Directive({
+        selector: '[failInInputAlways]',
+      })
+      class FailInInputAlways {
+        @Input()
+        set failInInputAlways(value: string) {
+          throw new Error('Error in an input');
+        }
+      }
+
+      @Component({
+        selector: 'test',
+        template: `<div failInInputAlways="static"></div>`,
+      })
+      class TestCmpt {
+      }
+
+      TestBed.configureTestingModule({
+        declarations: [TestCmpt, FailInInputAlways],
+      });
+
+      expect(() => {
+        TestBed.createComponent(TestCmpt);
+      }).toThrowError('Error in an input');
+
+      expect(() => {
+        TestBed.createComponent(TestCmpt);
+      }).toThrowError('Error in an input');
+    });
+
+    // more tests to write for cases where we invoke component code in the creation mode:
+    // - static query setter that throws
   });
 });
