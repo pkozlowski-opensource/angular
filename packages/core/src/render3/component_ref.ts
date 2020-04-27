@@ -230,10 +230,8 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
     const isInternalRootComponent = typeof rootSelectorOrNode === 'string' &&
         /^#root-ng-internal-isolated-\d+/.test(rootSelectorOrNode);
 
-    if (!rootSelectorOrNode || isInternalRootComponent) {
-      // The host element of the internal root view is attached to the component's host view node.
-      componentRef.hostView._tViewNode!.child = tElementNode;
-    }
+    // The host element of the internal root view is attached to the component's host view node.
+    componentRef.hostView._tViewNode!.child = tElementNode;
     return componentRef;
   }
 }
