@@ -306,6 +306,20 @@ describe('TestBed', () => {
     expect(SimpleService.ngOnDestroyCalls).toBe(0);
   });
 
+  it('should prevent usage of a destroyed fixture', () => {
+    @Component({selector: 'test-cmpt', template: ``})
+    class TestCmpt {
+    }
+
+    TestBed.configureTestingModule({declarations: [TestCmpt]});
+    const fixture = TestBed.createComponent(TestCmpt);
+
+    fixture.destroy();
+
+    expect(() => {fixture.detectChanges()})
+        .toThrowError(/Attempt to use a destroyed view: detectChanges/);
+  });
+
   describe('module overrides using TestBed.overrideModule', () => {
     @Component({
       selector: 'test-cmp',
