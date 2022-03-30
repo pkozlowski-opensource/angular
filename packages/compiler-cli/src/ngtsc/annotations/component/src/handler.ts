@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {AnimationTriggerNames, compileClassMetadata, compileComponentFromMetadata, compileDeclareClassMetadata, compileDeclareComponentFromMetadata, ConstantPool, CssSelector, DeclarationListEmitMode, DeclareComponentTemplateInfo, DEFAULT_INTERPOLATION_CONFIG, DomElementSchemaRegistry, Expression, FactoryTarget, makeBindingParser, R3ComponentMetadata, R3DirectiveDependencyMetadata, R3PipeDependencyMetadata, R3TargetBinder, R3TemplateDependency, R3TemplateDependencyKind, R3TemplateDependencyMetadata, SelectorMatcher, ViewEncapsulation, WrappedNodeExpr} from '@angular/compiler';
+import {AnimationTriggerNames, compileClassMetadata, compileComponentFromMetadata, compileDeclareClassMetadata, compileDeclareComponentFromMetadata, ConstantPool, CssSelector, DeclarationListEmitMode, DeclareComponentTemplateInfo, DEFAULT_INTERPOLATION_CONFIG, DomElementSchemaRegistry, Expression, FactoryTarget, makeBindingParser, R3ComponentMetadata, R3DirectiveDependencyMetadata, R3NgModuleDependencyMetadata, R3PipeDependencyMetadata, R3TargetBinder, R3TemplateDependency, R3TemplateDependencyKind, R3TemplateDependencyMetadata, SelectorMatcher, ViewEncapsulation, WrappedNodeExpr} from '@angular/compiler';
 import ts from 'typescript';
 
 import {Cycle, CycleAnalyzer, CycleHandlingStrategy} from '../../../cycles';
@@ -16,7 +16,7 @@ import {assertSuccessfulReferenceEmit, ImportedFile, ModuleResolver, Reference, 
 import {DependencyTracker} from '../../../incremental/api';
 import {extractSemanticTypeParameters, SemanticDepGraphUpdater} from '../../../incremental/semantic_graph';
 import {IndexingContext} from '../../../indexer';
-import {DirectiveMeta, extractDirectiveTypeCheckMeta, InjectableClassRegistry, MetadataReader, MetadataRegistry, MetaType, PipeMeta, ResourceRegistry} from '../../../metadata';
+import {DirectiveMeta, extractDirectiveTypeCheckMeta, InjectableClassRegistry, MetadataReader, MetadataRegistry, MetaType, NgModuleMeta, PipeMeta, ResourceRegistry} from '../../../metadata';
 import {PartialEvaluator} from '../../../partial_evaluator';
 import {PerfEvent, PerfRecorder} from '../../../perf';
 import {ClassDeclaration, DeclarationNode, Decorator, ReflectionHost, reflectObjectLiteral} from '../../../reflection';
@@ -635,7 +635,11 @@ export class ComponentDecoratorHandler implements
         importedFile: ImportedFile,
       };
 
-      const declarations: (UsedPipe|UsedDirective)[] = [];
+      type UsedNgModule = R3NgModuleDependencyMetadata&{
+        importedFile: ImportedFile,
+      };
+
+      const declarations: (UsedPipe|UsedDirective|UsedNgModule)[] = [];
 
       // Transform the dependencies list, filtering out unused dependencies.
       for (const dep of scope.dependencies) {
@@ -676,12 +680,26 @@ export class ComponentDecoratorHandler implements
               importedFile: pipeType.importedFile,
             });
             break;
+          case MetaType.NgModule:
+            if (!used.has(dep.ref.node)) {
+              continue;
+            }
+
+            const ngModuleType = this.refEmitter.emit(dep.ref, context);
+            assertSuccessfulReferenceEmit(ngModuleType, node.name, 'NgModule');
+
+            declarations.push({
+              kind: R3TemplateDependencyKind.NgModule,
+              type: ngModuleType.expression,
+              importedFile: ngModuleType.importedFile,
+            });
+            break;
         }
       }
 
-      const isUsedDirective = (decl: UsedDirective|UsedPipe): decl is UsedDirective =>
+      const isUsedDirective = (decl: UsedDirective|UsedPipe|UsedNgModule): decl is UsedDirective =>
           decl.kind === R3TemplateDependencyKind.Directive;
-      const isUsedPipe = (decl: UsedDirective|UsedPipe): decl is UsedPipe =>
+      const isUsedPipe = (decl: UsedDirective|UsedPipe|UsedNgModule): decl is UsedPipe =>
           decl.kind === R3TemplateDependencyKind.Pipe;
 
       const getSemanticReference = (decl: UsedDirective|UsedPipe) =>
