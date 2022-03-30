@@ -152,6 +152,7 @@ export {
   ɵɵpropertyInterpolate8,
   ɵɵpropertyInterpolateV,
   ɵɵProvidersFeature,
+  ɵɵstandaloneProvidersFeature,
   ɵɵpureFunction0,
   ɵɵpureFunction1,
   ɵɵpureFunction2,

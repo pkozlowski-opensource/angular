@@ -172,6 +172,8 @@ function compileUsedDependenciesMetadata(meta: R3ComponentMetadata): o.LiteralAr
         pipeMeta.set('type', wrapType(decl.type));
         pipeMeta.set('name', o.literal(decl.name));
         return pipeMeta.toLiteralMap();
+      default:
+        throw new Error('should not happen');
     }
   });
 }

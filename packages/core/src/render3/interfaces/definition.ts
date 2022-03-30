@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ProcessProvidersFunction} from '../../di/interface/provider';
+import {ProcessProvidersFunction, Provider} from '../../di/interface/provider';
 import {Type} from '../../interface/type';
 import {SchemaMetadata} from '../../metadata/schema';
 import {ViewEncapsulation} from '../../metadata/view';
@@ -288,6 +288,14 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
 
   /** Whether or not this component's ChangeDetectionStrategy is OnPush */
   readonly onPush: boolean;
+
+  // TODO(pk): documentation, but essentially it is a function that return a collected list of
+  // ambient providers THINK(pk): how are we going to cache the results?
+  ambientProviders: () => Provider[];
+
+  // TODO(pk): documentation - essentially a processed (forward refs) version of "dependencies".
+  // This info is needed in the "standalone" feature
+  dependencies: DependencyTypeList|null;
 
   /**
    * Registry of directives and components that may be found in this view.

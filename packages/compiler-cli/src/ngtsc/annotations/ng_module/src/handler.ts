@@ -12,7 +12,7 @@ import ts from 'typescript';
 import {ErrorCode, FatalDiagnosticError, makeDiagnostic, makeRelatedInformation} from '../../../diagnostics';
 import {assertSuccessfulReferenceEmit, Reference, ReferenceEmitter} from '../../../imports';
 import {isArrayEqual, isReferenceEqual, isSymbolEqual, SemanticReference, SemanticSymbol} from '../../../incremental/semantic_graph';
-import {InjectableClassRegistry, MetadataReader, MetadataRegistry} from '../../../metadata';
+import {InjectableClassRegistry, MetadataReader, MetadataRegistry, MetaType} from '../../../metadata';
 import {PartialEvaluator, ResolvedValue} from '../../../partial_evaluator';
 import {PerfEvent, PerfRecorder} from '../../../perf';
 import {ClassDeclaration, Decorator, isNamedClassDeclaration, ReflectionHost, reflectObjectLiteral, typeNodeToValueExpr} from '../../../reflection';
@@ -406,6 +406,7 @@ export class NgModuleDecoratorHandler implements
       rawDeclarations: analysis.rawDeclarations,
       rawImports: analysis.rawImports,
       rawExports: analysis.rawExports,
+      type: MetaType.NgModule
     });
 
     if (this.factoryTracker !== null) {

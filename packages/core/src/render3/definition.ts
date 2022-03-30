@@ -307,8 +307,10 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
       outputs: null!,  // assigned in noSideEffects
       exportAs: componentDefinition.exportAs || null,
       onPush: componentDefinition.changeDetection === ChangeDetectionStrategy.OnPush,
-      directiveDefs: null!,  // assigned in noSideEffects
-      pipeDefs: null!,       // assigned in noSideEffects
+      dependencies: null!,      // assigned in noSideEffects
+      directiveDefs: null!,     // assigned in noSideEffects
+      pipeDefs: null!,          // assigned in noSideEffects
+      ambientProviders: null!,  // assigned in noSideEffects
       standalone: componentDefinition.standalone === true,
       selectors: componentDefinition.selectors || EMPTY_ARRAY,
       viewQuery: componentDefinition.viewQuery || null,
@@ -322,22 +324,17 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
       schemas: componentDefinition.schemas || null,
       tView: null,
     };
-    const dependencies = componentDefinition.dependencies;
+    const dependencies = componentDefinition.dependencies ?? null;
     const feature = componentDefinition.features;
     def.id += _renderCompCount++;
     def.inputs = invertObject(componentDefinition.inputs, declaredInputs),
     def.outputs = invertObject(componentDefinition.outputs),
+    def.dependencies = typeof dependencies === 'function' ? dependencies() : dependencies;
+
     feature && feature.forEach((fn) => fn(def));
-    def.directiveDefs = dependencies ?
-        (() => (typeof dependencies === 'function' ? dependencies() : dependencies)
-                   .map(extractDirectiveDef)
-                   .filter(nonNull)) :
-        null;
-    def.pipeDefs = dependencies ?
-        (() => (typeof dependencies === 'function' ? dependencies() : dependencies)
-                   .map(getPipeDef)
-                   .filter(nonNull)) :
-        null;
+
+    def.directiveDefs = def.dependencies?.map(extractDirectiveDef).filter(nonNull) ?? null;
+    def.pipeDefs = def.dependencies?.map(getPipeDef).filter(nonNull) ?? null;
 
     return def;
   });

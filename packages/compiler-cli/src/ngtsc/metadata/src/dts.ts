@@ -57,6 +57,7 @@ export class DtsMetadataReader implements MetadataReader {
       rawDeclarations: null,
       rawImports: null,
       rawExports: null,
+      type: MetaType.NgModule
     };
   }
 
