@@ -6,7 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ProcessProvidersFunction} from '../../di/interface/provider';
+import {Injector} from '../../di';
+import {ProcessProvidersFunction, StaticProvider} from '../../di/interface/provider';
 import {Type} from '../../interface/type';
 import {SchemaMetadata} from '../../metadata/schema';
 import {ViewEncapsulation} from '../../metadata/view';
@@ -316,6 +317,12 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
    */
   tView: TView|null;
 
+  // TODO(pk): document
+  getStandaloneInjector: ((parentInjector: Injector) => Injector)|null;
+
+  // TODO(pk): document
+  getAmbientProviders: (() => StaticProvider[])|null;
+
   /**
    * Used to store the result of `noSideEffects` function so that it is not removed by closure
    * compiler. The property should never be read.
@@ -383,7 +390,8 @@ export interface DirectiveDefFeature {
 }
 
 export interface ComponentDefFeature {
-  <T>(componentDef: ComponentDef<T>): void;
+  // TODO(pk): extract type for the codegen object
+  <T>(componentDef: ComponentDef<T>, codegenDef: any): void;
   /**
    * Marks a feature as something that {@link InheritDefinitionFeature} will execute
    * during inheritance.

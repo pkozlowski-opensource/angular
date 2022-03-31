@@ -310,6 +310,8 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
       directiveDefs: null!,  // assigned in noSideEffects
       pipeDefs: null!,       // assigned in noSideEffects
       standalone: componentDefinition.standalone === true,
+      getStandaloneInjector: null,
+      getAmbientProviders: null,
       selectors: componentDefinition.selectors || EMPTY_ARRAY,
       viewQuery: componentDefinition.viewQuery || null,
       features: componentDefinition.features as DirectiveDefFeature[] || null,
@@ -327,7 +329,7 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
     def.id += _renderCompCount++;
     def.inputs = invertObject(componentDefinition.inputs, declaredInputs),
     def.outputs = invertObject(componentDefinition.outputs),
-    feature && feature.forEach((fn) => fn(def));
+    feature && feature.forEach((fn) => fn(def, componentDefinition));
     def.directiveDefs = dependencies ?
         (() => (typeof dependencies === 'function' ? dependencies() : dependencies)
                    .map(extractDirectiveDef)
