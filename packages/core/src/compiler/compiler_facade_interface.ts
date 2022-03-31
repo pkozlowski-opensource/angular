@@ -168,6 +168,13 @@ export interface R3DirectiveMetadataFacade {
   isStandalone: boolean;
 }
 
+
+export enum R3UsedDeclarationKind {
+  Directive = 0,
+  Pipe = 1,
+  NgModule = 2,
+}
+
 export interface R3ComponentMetadataFacade extends R3DirectiveMetadataFacade {
   template: string;
   preserveWhitespaces: boolean;
