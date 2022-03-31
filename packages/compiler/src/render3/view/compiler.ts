@@ -140,6 +140,7 @@ export function compileDirectiveFromMetadata(
 export function compileComponentFromMetadata(
     meta: R3ComponentMetadata, constantPool: ConstantPool,
     bindingParser: BindingParser): R3CompiledExpression {
+  debugger;
   const definitionMap = baseDirectiveFields(meta, constantPool, bindingParser);
   addFeatures(definitionMap, meta);
 

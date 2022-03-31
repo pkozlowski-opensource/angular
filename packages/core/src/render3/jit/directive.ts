@@ -7,7 +7,7 @@
  */
 
 import {getCompilerFacade, JitCompilerUsage, R3DirectiveMetadataFacade} from '../../compiler/compiler_facade';
-import {R3ComponentMetadataFacade, R3QueryMetadataFacade} from '../../compiler/compiler_facade_interface';
+import {R3ComponentMetadataFacade, R3QueryMetadataFacade, R3UsedDeclarationKind, R3UsedDeclarationMetadata, R3UsedDirectiveMetadata, R3UsedNgModuleMetadata, R3UsedPipeMetadata} from '../../compiler/compiler_facade_interface';
 import {resolveForwardRef} from '../../di/forward_ref';
 import {getReflect, reflectDependencies} from '../../di/jit/util';
 import {Type} from '../../interface/type';
@@ -15,9 +15,11 @@ import {Query} from '../../metadata/di';
 import {Component, Directive, Input} from '../../metadata/directives';
 import {componentNeedsResolution, maybeQueueResolutionOfComponentResources} from '../../metadata/resource_loading';
 import {ViewEncapsulation} from '../../metadata/view';
+import {NgModuleDef} from '../../r3_symbols';
+import {flatten} from '../../util/array_utils';
 import {EMPTY_ARRAY, EMPTY_OBJ} from '../../util/empty';
 import {initNgDevMode} from '../../util/ng_dev_mode';
-import {getComponentDef, getDirectiveDef} from '../definition';
+import {getComponentDef, getDirectiveDef, getNgModuleDef, getPipeDef} from '../definition';
 import {NG_COMP_DEF, NG_DIR_DEF, NG_FACTORY_DEF} from '../fields';
 import {ComponentType} from '../interfaces/definition';
 import {stringifyForError} from '../util/stringify_utils';
@@ -105,6 +107,12 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
           }
         }
 
+        let declarations: R3UsedDeclarationMetadata[] = [];
+        if (metadata.standalone && metadata.imports) {
+          // Process imports.
+          declarations = getStandaloneDependencies(flatten(metadata.imports));
+        }
+
         const templateUrl = metadata.templateUrl || `ng:///${type.name}/template.html`;
         const meta: R3ComponentMetadataFacade = {
           ...directiveMetadata(type, metadata),
@@ -113,11 +121,12 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
           preserveWhitespaces,
           styles: metadata.styles || EMPTY_ARRAY,
           animations: metadata.animations,
-          declarations: [],
+          declarations,
           changeDetection: metadata.changeDetection,
           encapsulation,
           interpolation: metadata.interpolation,
           viewProviders: metadata.viewProviders || null,
+          isStandalone: !!metadata.standalone,
         };
 
         compilationDepth++;
@@ -154,6 +163,56 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
     // Make the property configurable in dev mode to allow overriding in tests
     configurable: !!ngDevMode,
   });
+}
+
+function getStandaloneDependencies(imports: Type<any>[]): R3UsedDeclarationMetadata[] {
+  const dependencies: R3UsedDeclarationMetadata[] = [];
+  for (const rawDep of imports) {
+    const dep = resolveForwardRef(rawDep);
+    if (!dep) {
+      // TODO: real error
+      throw new Error(`ForwardRef issue?`);
+    }
+    const ngModuleDef: NgModuleDef<any>|null = getNgModuleDef(dep);
+    if (ngModuleDef) {
+      dependencies.push({
+        kind: R3UsedDeclarationKind.NgModule,
+        type: dep as any,
+      } as R3UsedNgModuleMetadata);
+
+      const scopes = transitiveScopesFor(ngModuleDef.type);
+      for (const dir of scopes.exported.directives) {
+        dependencies.push({
+          kind: R3UsedDeclarationKind.Directive,
+          type: dir,
+        } as R3UsedDirectiveMetadata);
+      }
+
+      for (const dir of scopes.exported.pipes) {
+        dependencies.push({
+          kind: R3UsedDeclarationKind.Pipe,
+          type: dir,
+        } as R3UsedPipeMetadata);
+      }
+    }
+
+    const dirDef = getComponentDef(dep) || getDirectiveDef(dep);
+    const anyDef = dirDef || getPipeDef(dep);
+    if (anyDef) {
+      if (!anyDef.standalone) {
+        // TODO: real error
+        throw new Error(`What are you doing? You imported a non-standalone thing!`);
+      }
+
+      dependencies.push(
+          {
+            kind: dirDef ? R3UsedDeclarationKind.Directive : R3UsedDeclarationKind.Pipe,
+            type: dep,
+          } as R3UsedDirectiveMetadata |
+          R3UsedPipeMetadata);
+    }
+  }
+  return dependencies;
 }
 
 function hasSelectorScope<T>(component: Type<T>): component is Type<T>&
@@ -258,7 +317,7 @@ export function directiveMetadata(type: Type<any>, metadata: Directive): R3Direc
     viewQueries: extractQueriesMetadata(type, propMetadata, isViewQuery),
     // TODO(alxhub): pass through the standalone flag from the directive metadata once standalone
     // functionality is fully rolled out.
-    isStandalone: false,
+    isStandalone: !!metadata.standalone,
   };
 }
 

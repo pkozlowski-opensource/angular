@@ -168,6 +168,13 @@ export interface R3DirectiveMetadataFacade {
   isStandalone: boolean;
 }
 
+
+export enum R3UsedDeclarationKind {
+  Directive = 0,
+  Pipe = 1,
+  NgModule = 2,
+}
+
 export interface R3ComponentMetadataFacade extends R3DirectiveMetadataFacade {
   template: string;
   preserveWhitespaces: boolean;
@@ -242,7 +249,8 @@ export interface R3DeclareUsedPipeFacade {
   type: OpaqueValue|(() => OpaqueValue);
 }
 
-export type R3UsedDeclarationMetadata = R3UsedDirectiveMetadata|R3UsedPipeMetadata;
+export type R3UsedDeclarationMetadata =
+    R3UsedDirectiveMetadata|R3UsedPipeMetadata|R3UsedNgModuleMetadata;
 
 export interface R3UsedDirectiveMetadata {
   kind: number;
@@ -257,6 +265,12 @@ export interface R3UsedDirectiveMetadata {
 export interface R3UsedPipeMetadata {
   kind: number;
   name: string;
+  type: any;
+}
+
+
+export interface R3UsedNgModuleMetadata {
+  kind: number;
   type: any;
 }
 

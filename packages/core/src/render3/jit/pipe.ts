@@ -6,6 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {pipe} from 'rxjs';
+
 import {getCompilerFacade, JitCompilerUsage, R3PipeMetadataFacade} from '../../compiler/compiler_facade';
 import {reflectDependencies} from '../../di/jit/util';
 import {Type} from '../../interface/type';
@@ -60,8 +62,6 @@ function getPipeMetadata(type: Type<any>, meta: Pipe): R3PipeMetadataFacade {
     name: type.name,
     pipeName: meta.name,
     pure: meta.pure !== undefined ? meta.pure : true,
-    // TODO(alxhub): pass through the standalone flag from the pipe metadata once standalone
-    // functionality is fully rolled out.
-    isStandalone: false,
+    isStandalone: !!meta.standalone,
   };
 }

@@ -186,6 +186,7 @@ export class CompilerFacadeImpl implements CompilerFacade {
     const meta: R3ComponentMetadata = {
       ...facade as R3ComponentMetadataFacadeNoPropAndWhitespace,
       ...convertDirectiveFacadeToMetadata(facade),
+      declarations: facade.declarations.map(convertDeclarationFacadeToMetadata),
       selector: facade.selector || this.elementSchemaRegistry.getDefaultComponentElementName(),
       template,
       declarationListEmitMode: DeclarationListEmitMode.Direct,
@@ -321,6 +322,13 @@ function convertQueryPredicate(predicate: OpaqueValue|string[]): MaybeForwardRef
       predicate :
       // The predicate is a type - assume that we will need to unwrap any `forwardRef()` calls.
       createMayBeForwardRefExpression(new WrappedNodeExpr(predicate), ForwardRefHandling.Wrapped);
+}
+
+function convertDeclarationFacadeToMetadata(facade: any): R3UsedDeclarationMetadata {
+  return {
+    ...facade,
+    type: new WrappedNodeExpr(facade.type),
+  };
 }
 
 function convertDirectiveFacadeToMetadata(facade: R3DirectiveMetadataFacade): R3DirectiveMetadata {
