@@ -129,7 +129,14 @@ export class ComponentFactory<T> extends viewEngine_ComponentFactory<T> {
       ngModule?: viewEngine_NgModuleRef<any>|undefined): viewEngine_ComponentRef<T> {
     ngModule = ngModule || this.ngModule;
 
-    const rootViewInjector = ngModule ? new ChainedInjector(injector, ngModule.injector) : injector;
+    let ngModuleInjector = ngModule?.injector;
+    if (ngModuleInjector && this.componentDef.getStandaloneInjector !== null) {
+      ngModuleInjector =
+          this.componentDef.getStandaloneInjector(ngModuleInjector) || ngModuleInjector;
+    }
+
+    const rootViewInjector =
+        ngModuleInjector ? new ChainedInjector(injector, ngModuleInjector) : injector;
 
     const rendererFactory =
         rootViewInjector.get(RendererFactory2, domRendererFactory3 as RendererFactory2) as
