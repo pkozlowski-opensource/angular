@@ -30,8 +30,6 @@ import {NullInjector} from './null_injector';
 import {ProviderToken} from './provider_token';
 import {INJECTOR_SCOPE} from './scope';
 
-
-
 /**
  * Internal type for a single provider in a deep provider array.
  */
