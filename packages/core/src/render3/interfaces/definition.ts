@@ -7,7 +7,7 @@
  */
 
 import {Injector} from '../../di';
-import {ProcessProvidersFunction, StaticProvider} from '../../di/interface/provider';
+import {ProcessProvidersFunction} from '../../di/interface/provider';
 import {Type} from '../../interface/type';
 import {SchemaMetadata} from '../../metadata/schema';
 import {ViewEncapsulation} from '../../metadata/view';
@@ -319,9 +319,6 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
 
   // TODO(pk): document
   getStandaloneInjector: ((parentInjector: Injector) => Injector | null)|null;
-
-  // TODO(pk): document
-  getAmbientProviders: (() => StaticProvider[])|null;
 
   /**
    * Used to store the result of `noSideEffects` function so that it is not removed by closure

@@ -11,15 +11,26 @@ import {createInjectorWithoutInjectorInstances, R3Injector} from '../../di/r3_in
 import {OnDestroy} from '../../metadata';
 import {ComponentDef, DependencyTypeList, TypeOrFactory} from '../interfaces/definition';
 
-// TODO(pk): code duplication
 function nonNull<T>(value: T|null): value is T {
   return value !== null;
 }
 
-// Yay!
+// TODO(pk): this is a POC, extract / unify this logic with R3Injector
+function getAmbientProviders(dependencies: TypeOrFactory<DependencyTypeList>) {
+  const moduleDeps = (typeof dependencies === 'function' ? dependencies() : dependencies)
+                         .map(getInjectorDef)
+                         .filter(nonNull);
+
+  const providers = moduleDeps.reduce((soFar: Provider[], injectorDef) => {
+    return [...soFar, ...injectorDef.providers];
+  }, []);
+
+  return providers as StaticProvider[];
+}
+
+// TODO(pk): document
 @Injectable({providedIn: 'any'})
 class StandaloneService implements OnDestroy {
-  // Question: shell we cache injectors of collected providers?
   cachedInjectors = new Map<ComponentDef<unknown>, R3Injector>();
 
   constructor(private _injector: Injector) {}
@@ -28,14 +39,15 @@ class StandaloneService implements OnDestroy {
     this.cachedInjectors.set(componentDef, injector);
   }
 
-  // TODO(pk): return a null when we don't need a standalone injector
-  getOrCreateStandaloneInjector(componentDef: ComponentDef<unknown>): Injector|null {
-    if (componentDef.getAmbientProviders === null) {
+  getOrCreateStandaloneInjector(
+      componentDef: ComponentDef<unknown>,
+      dependencies: TypeOrFactory<DependencyTypeList>): Injector|null {
+    if (componentDef.getStandaloneInjector === null) {
       return null;
     }
 
     if (!this.cachedInjectors.has(componentDef)) {
-      const providers = componentDef.getAmbientProviders();
+      const providers = getAmbientProviders(dependencies);
       if (providers.length) {
         const standaloneInjector =
             createInjectorWithoutInjectorInstances({name: ''}, this._injector, providers);
@@ -49,8 +61,6 @@ class StandaloneService implements OnDestroy {
   }
 
   ngOnDestroy() {
-    // Question: do we need to do this manually? In other words: are child injectors destroyed when
-    // a parent injector is destroyed? Probably not since not every injector is "destroyable"?
     try {
       for (const injector of this.cachedInjectors.values()) {
         if (injector !== this._injector) {
@@ -58,8 +68,6 @@ class StandaloneService implements OnDestroy {
         }
       }
     } finally {
-      // Question: a map should be cleared when this objects gets destroyed, right? But at the same
-      // time this map might reference this very injector? In any case clearing wouldn't hurt...
       this.cachedInjectors.clear();
     }
   }
@@ -73,32 +81,8 @@ class StandaloneService implements OnDestroy {
 export function ɵɵStandaloneFeature(
     definition: ComponentDef<unknown>,
     {dependencies}: {dependencies: TypeOrFactory<DependencyTypeList>}) {
-  let resolvedProviders: StaticProvider[]|undefined = undefined;
-  definition.getAmbientProviders = () => {
-    // TODO(pk): quick and dirty POC to get providers from modules; it needs significently more
-    // work:
-    // - descent into imports of NgModule(s)
-    // - take into account standalone coponents + descent into
-
-    // Question: this logic will be somehow duplicated with what R3Injector does - can we refactor
-    // / reuse?
-
-    if (resolvedProviders === undefined) {
-      const moduleDeps = (typeof dependencies === 'function' ? dependencies() : dependencies)
-                             .map(getInjectorDef)
-                             .filter(nonNull);
-
-      const providers = moduleDeps.reduce((soFar: Provider[], injectorDef) => {
-        return [...soFar, ...injectorDef.providers];
-      }, []);
-
-      resolvedProviders = providers as StaticProvider[];
-    }
-
-    return resolvedProviders;
-  };
-
   definition.getStandaloneInjector = (parentInjector: Injector) => {
-    return parentInjector.get(StandaloneService).getOrCreateStandaloneInjector(definition);
+    return parentInjector.get(StandaloneService)
+        .getOrCreateStandaloneInjector(definition, dependencies);
   };
 }

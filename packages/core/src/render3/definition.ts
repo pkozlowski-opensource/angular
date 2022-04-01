@@ -311,7 +311,6 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
       pipeDefs: null!,       // assigned in noSideEffects
       standalone: componentDefinition.standalone === true,
       getStandaloneInjector: null,
-      getAmbientProviders: null,
       selectors: componentDefinition.selectors || EMPTY_ARRAY,
       viewQuery: componentDefinition.viewQuery || null,
       features: componentDefinition.features as DirectiveDefFeature[] || null,
