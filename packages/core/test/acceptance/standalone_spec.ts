@@ -9,8 +9,8 @@
 import {Component, NgModule} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 
-describe('standalone stuff', () => {
-  fit('should not suck', () => {
+describe('standalone components, directives and pipes', () => {
+  it('should render a standalone component with dependenices and ambient providers', () => {
     @Component({
       standalone: true,
       template: 'Inner',
@@ -24,13 +24,13 @@ describe('standalone stuff', () => {
     }
 
     @NgModule({providers: [Service]})
-    class Module {
+    class ModuleWithAProvider {
     }
 
     @Component({
       standalone: true,
       template: 'Outer<inner-cmp></inner-cmp>{{service.value}}',
-      imports: [InnerCmp, Module],
+      imports: [InnerCmp, ModuleWithAProvider],
     })
     class OuterCmp {
       constructor(readonly service: Service) {}
