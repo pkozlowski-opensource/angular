@@ -320,6 +320,9 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
   // TODO(pk): document
   getStandaloneInjector: ((parentInjector: Injector) => Injector | null)|null;
 
+  // TODO(pk): document
+  dependencies: (() => DependencyTypeList)|null;
+
   /**
    * Used to store the result of `noSideEffects` function so that it is not removed by closure
    * compiler. The property should never be read.

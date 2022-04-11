@@ -7,26 +7,11 @@
  */
 import {Injectable, Injector, Provider, StaticProvider} from '../../di';
 import {getInjectorDef} from '../../di/interface/defs';
-import {createInjectorWithoutInjectorInstances, R3Injector} from '../../di/r3_injector';
+import {createInjectorWithoutInjectorInstances, importProvidersFrom, R3Injector, walkProviderTree} from '../../di/r3_injector';
+import {Type} from '../../interface/type';
 import {OnDestroy} from '../../metadata';
+import {stringify} from '../../util/stringify';
 import {ComponentDef, DependencyTypeList, TypeOrFactory} from '../interfaces/definition';
-
-function nonNull<T>(value: T|null): value is T {
-  return value !== null;
-}
-
-// TODO(pk): this is a POC, extract / unify this logic with R3Injector
-function getAmbientProviders(dependencies: TypeOrFactory<DependencyTypeList>) {
-  const moduleDeps = (typeof dependencies === 'function' ? dependencies() : dependencies)
-                         .map(getInjectorDef)
-                         .filter(nonNull);
-
-  const providers = moduleDeps.reduce((soFar: Provider[], injectorDef) => {
-    return [...soFar, ...injectorDef.providers];
-  }, []);
-
-  return providers as StaticProvider[];
-}
 
 // TODO(pk): document
 @Injectable({providedIn: 'any'})
@@ -39,22 +24,22 @@ class StandaloneService implements OnDestroy {
     this.cachedInjectors.set(componentDef, injector);
   }
 
-  getOrCreateStandaloneInjector(
-      componentDef: ComponentDef<unknown>,
-      dependencies: TypeOrFactory<DependencyTypeList>): Injector|null {
-    if (componentDef.getStandaloneInjector === null) {
+  getOrCreateStandaloneInjector(componentDef: ComponentDef<unknown>): Injector|null {
+    if (!componentDef.standalone) {
       return null;
     }
 
     if (!this.cachedInjectors.has(componentDef)) {
-      const providers = getAmbientProviders(dependencies);
-      if (providers.length) {
-        const standaloneInjector =
-            createInjectorWithoutInjectorInstances({name: ''}, this._injector, providers);
-        this.cachedInjectors.set(componentDef, standaloneInjector);
-      } else {
+      const providers = importProvidersFrom(componentDef.type);
+      if (!providers.length) {
         return null;
       }
+
+      // TODO: NgModuleRef?
+      const standaloneInjector =
+          new R3Injector(providers, this._injector, stringify(componentDef.type));
+      this.cachedInjectors.set(componentDef, standaloneInjector);
+      standaloneInjector.resolveInjectorInitializers();
     }
 
     return this.cachedInjectors.get(componentDef)!;
@@ -81,8 +66,8 @@ class StandaloneService implements OnDestroy {
 export function ɵɵStandaloneFeature(
     definition: ComponentDef<unknown>,
     {dependencies}: {dependencies: TypeOrFactory<DependencyTypeList>}) {
+  definition.dependencies = dependencies instanceof Function ? dependencies : () => dependencies;
   definition.getStandaloneInjector = (parentInjector: Injector) => {
-    return parentInjector.get(StandaloneService)
-        .getOrCreateStandaloneInjector(definition, dependencies);
+    return parentInjector.get(StandaloneService).getOrCreateStandaloneInjector(definition);
   };
 }

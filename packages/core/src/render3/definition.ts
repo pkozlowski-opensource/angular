@@ -309,6 +309,7 @@ export function ɵɵdefineComponent<T>(componentDefinition: {
       onPush: componentDefinition.changeDetection === ChangeDetectionStrategy.OnPush,
       directiveDefs: null!,  // assigned in noSideEffects
       pipeDefs: null!,       // assigned in noSideEffects
+      dependencies: null,
       standalone: componentDefinition.standalone === true,
       getStandaloneInjector: null,
       selectors: componentDefinition.selectors || EMPTY_ARRAY,

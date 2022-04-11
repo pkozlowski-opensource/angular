@@ -15,9 +15,9 @@ import {TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {BehaviorSubject} from 'rxjs';
 
-const hasProviderWithToken = (providers: StaticProvider[], token: InjectionToken<unknown>):
-    boolean => {
-      return providers.some(provider => (provider as any).provide === token);
+const findProvidersWithToken = (providers: StaticProvider[], token: InjectionToken<unknown>):
+    StaticProvider[] => {
+      return providers.filter(provider => (provider as any).provide === token);
     }
 
 const collectInjectorInitializerProviders = (providers: StaticProvider[]) =>
@@ -54,13 +54,13 @@ describe('importProvidersFrom', () => {
     // - `INJECTOR_INITIALIZER`
     expect(providers.length).toBe(10);
 
-    expect(hasProviderWithToken(providers, A)).toBe(true);
-    expect(hasProviderWithToken(providers, B)).toBe(true);
-    expect(hasProviderWithToken(providers, C)).toBe(true);
-    expect(hasProviderWithToken(providers, D)).toBe(true);
+    expect(findProvidersWithToken(providers, A).length).toBe(1);
+    expect(findProvidersWithToken(providers, B).length).toBe(1);
+    expect(findProvidersWithToken(providers, C).length).toBe(1);
+    expect(findProvidersWithToken(providers, D).length).toBe(1);
 
     // Expect 2 `INJECTOR_INITIALIZER` providers: one for `MyModule`, another was `MyModule2`
-    expect(collectInjectorInitializerProviders(providers).length).toBe(2);
+    expect(findProvidersWithToken(providers, INJECTOR_INITIALIZER).length).toBe(2);
   });
 });
 
