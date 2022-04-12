@@ -31,8 +31,6 @@ import {NullInjector} from './null_injector';
 import {ProviderToken} from './provider_token';
 import {INJECTOR_SCOPE} from './scope';
 
-
-
 /**
  * Internal type for a single provider in a deep provider array.
  */
@@ -71,7 +69,7 @@ const INJECTOR_DEF_TYPES = new InjectionToken<Type<unknown>>('INJECTOR_DEF_TYPES
  */
 let NULL_INJECTOR: Injector|undefined = undefined;
 
-function getNullInjector(): Injector {
+export function getNullInjector(): Injector {
   if (NULL_INJECTOR === undefined) {
     NULL_INJECTOR = new NullInjector();
   }
@@ -269,8 +267,32 @@ export function walkProviderTree(
       (container as InjectorTypeWithProviders<any>).providers !== undefined);
 }
 
+
+
 /**
- * Collects providers from all NgModules (transitively for all imported NgModules as well).
+ * An `Injector` that's part of the environment injector hierarchy, which exists outside of the
+ * component tree.
+ */
+export abstract class EnvInjector implements Injector {
+  /**
+   * Retrieves an instance from the injector based on the provided token.
+   * @returns The instance from the injector if defined, otherwise the `notFoundValue`.
+   * @throws When the `notFoundValue` is `undefined` or `Injector.THROW_IF_NOT_FOUND`.
+   */
+  abstract get<T>(token: ProviderToken<T>, notFoundValue?: T, flags?: InjectFlags): T;
+  /**
+   * @deprecated from v4.0.0 use ProviderToken<T>
+   * @suppress {duplicate}
+   */
+  abstract get(token: any, notFoundValue?: any): any;
+
+  abstract destroy(): void;
+
+  abstract onDestroy(callback: () => void): void;
+}
+
+/**
+ * Collects providers from all NgModules, including transitively imported ones.
  *
  * @returns The list of collected providers from the specified list of NgModules.
  */
@@ -282,7 +304,7 @@ export function importProvidersFrom(...injectorTypes: Array<Type<unknown>>): Sta
   return providers as StaticProvider[];
 }
 
-export class R3Injector {
+export class R3Injector extends EnvInjector {
   /**
    * Map of tokens to records which contain the instances of those tokens.
    * - `null` value implies that we don't have the record. Used by tree-shakable injectors
@@ -293,7 +315,9 @@ export class R3Injector {
   /**
    * Set of values instantiated by this injector which contain `ngOnDestroy` lifecycle hooks.
    */
-  private onDestroy = new Set<OnDestroy>();
+  private _ngOnDestroyHooks = new Set<OnDestroy>();
+
+  private _onDestroyHooks: Array<() => void> = [];
 
   /**
    * Flag indicating this injector provides the APP_ROOT_SCOPE token, and thus counts as the
@@ -313,6 +337,7 @@ export class R3Injector {
 
   constructor(
       providers: StaticProvider[], readonly parent: Injector, readonly source: string|null = null) {
+    super();
     // Start off by creating Records for every provider.
     for (const provider of providers) {
       this.processProvider(provider as SingleProvider);
@@ -320,6 +345,9 @@ export class R3Injector {
 
     // Make sure the INJECTOR token provides this injector.
     this.records.set(INJECTOR, makeRecord(undefined, this));
+
+    // And `EnvInjector`.
+    this.records.set(EnvInjector, makeRecord(undefined, this));
 
     // Detect whether this injector has the APP_ROOT_SCOPE token and thus should provide
     // any injectable scoped to APP_ROOT_SCOPE.
@@ -342,18 +370,26 @@ export class R3Injector {
     this._destroyed = true;
     try {
       // Call all the lifecycle hooks.
-      for (const service of this.onDestroy) {
+      for (const service of this._ngOnDestroyHooks) {
         service.ngOnDestroy();
+      }
+      for (const hook of this._onDestroyHooks) {
+        hook();
       }
     } finally {
       // Release all references.
       this.records.clear();
-      this.onDestroy.clear();
+      this._ngOnDestroyHooks.clear();
       this.injectorDefTypes.clear();
+      this._onDestroyHooks.length = 0;
     }
   }
 
-  get<T>(
+  onDestroy(callback: () => void): void {
+    this._onDestroyHooks.push(callback);
+  }
+
+  override get<T>(
       token: ProviderToken<T>, notFoundValue: any = THROW_IF_NOT_FOUND,
       flags = InjectFlags.Default): T {
     this.assertNotDestroyed();
@@ -429,7 +465,7 @@ export class R3Injector {
     }
   }
 
-  toString() {
+  override toString() {
     const tokens: string[] = [];
     const records = this.records;
     for (const token of records.keys()) {
@@ -492,7 +528,7 @@ export class R3Injector {
       record.value = record.factory!();
     }
     if (typeof record.value === 'object' && record.value && hasOnDestroy(record.value)) {
-      this.onDestroy.add(record.value);
+      this._ngOnDestroyHooks.add(record.value);
     }
     return record.value as T;
   }

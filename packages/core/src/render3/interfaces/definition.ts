@@ -6,8 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Injector} from '../../di';
 import {ProcessProvidersFunction} from '../../di/interface/provider';
+import {EnvInjector} from '../../di/r3_injector';
 import {Type} from '../../interface/type';
 import {SchemaMetadata} from '../../metadata/schema';
 import {ViewEncapsulation} from '../../metadata/view';
@@ -318,7 +318,7 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
   tView: TView|null;
 
   // TODO(pk): document
-  getStandaloneInjector: ((parentInjector: Injector) => Injector | null)|null;
+  getStandaloneInjector: ((parentInjector: EnvInjector) => EnvInjector | null)|null;
 
   // TODO(pk): document
   dependencies: (() => DependencyTypeList)|null;
