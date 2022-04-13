@@ -6,7 +6,8 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {EnvInjector, Injectable, Provider, StaticProvider} from '../../di';
-import {getInjectorDef} from '../../di/interface/defs';
+import {inject} from '../../di/injector_compatibility';
+import {ɵɵdefineInjectable as defineInjectable} from '../../di/interface/defs';
 import {createInjectorWithoutInjectorInstances, importProvidersFrom, R3Injector, walkProviderTree} from '../../di/r3_injector';
 import {Type} from '../../interface/type';
 import {OnDestroy} from '../../metadata';
@@ -15,8 +16,7 @@ import {ComponentDef, DependencyTypeList, TypeOrFactory} from '../interfaces/def
 import {createEnvInjector} from '../ng_module_ref';
 
 // TODO(pk): document
-@Injectable({providedIn: 'any'})
-class StandaloneService implements OnDestroy {
+export class StandaloneService implements OnDestroy {
   cachedInjectors = new Map<ComponentDef<unknown>, EnvInjector>();
 
   constructor(private _injector: EnvInjector) {}
@@ -55,6 +55,12 @@ class StandaloneService implements OnDestroy {
       this.cachedInjectors.clear();
     }
   }
+
+  static ɵprov = /** @pureOrBreakMyCode */ defineInjectable({
+    token: StandaloneService,
+    providedIn: 'env',
+    factory: () => new StandaloneService(inject(EnvInjector)),
+  });
 }
 
 /**
