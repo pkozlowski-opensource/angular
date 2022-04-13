@@ -108,12 +108,13 @@ export class NgModuleFactory<T> extends viewEngine_NgModuleFactory<T> {
   }
 }
 
-class EnvNgModuleRefAdapter implements viewEngine_NgModuleRef<null> {
+class EnvNgModuleRefAdapter extends viewEngine_NgModuleRef<null> {
   readonly injector: EnvInjector;
   readonly componentFactoryResolver: ComponentFactoryResolver = new ComponentFactoryResolver(this);
   readonly instance = null;
 
   constructor(providers: Provider[], parent: EnvInjector|null, source: string|null) {
+    super();
     const injector = new R3Injector(
         [
           ...providers,
