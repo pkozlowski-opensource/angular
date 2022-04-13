@@ -26,7 +26,7 @@ import {catchInjectorError, inject, injectArgs, NG_TEMP_TOKEN_PATH, setCurrentIn
 import {INJECTOR} from './injector_token';
 import {getInheritedInjectableDef, getInjectableDef, getInjectorDef, InjectorType, InjectorTypeWithProviders, ɵɵInjectableDeclaration} from './interface/defs';
 import {InjectFlags} from './interface/injector';
-import {ClassProvider, ConstructorProvider, ExistingProvider, FactoryProvider, StaticClassProvider, StaticProvider, TypeProvider, ValueProvider} from './interface/provider';
+import {ClassProvider, ConstructorProvider, ExistingProvider, FactoryProvider, Provider, StaticClassProvider, StaticProvider, TypeProvider, ValueProvider} from './interface/provider';
 import {NullInjector} from './null_injector';
 import {ProviderToken} from './provider_token';
 import {INJECTOR_SCOPE, InjectorScope} from './scope';
@@ -297,12 +297,11 @@ export abstract class EnvInjector implements Injector {
  *
  * @returns The list of collected providers from the specified list of NgModules.
  */
-export function importProvidersFrom(...injectorTypes: Array<Type<unknown>>): StaticProvider[] {
+export function importProvidersFrom(...injectorTypes: Array<Type<unknown>>): Provider[] {
   const providers: SingleProvider[] = [];
   deepForEach(
       injectorTypes, injectorDef => walkProviderTree(injectorDef, providers, [], new Set()));
-  // TODO: fix types
-  return providers as StaticProvider[];
+  return providers;
 }
 
 export class R3Injector extends EnvInjector {
@@ -331,7 +330,7 @@ export class R3Injector extends EnvInjector {
   private injectorDefTypes: Set<Type<unknown>>;
 
   constructor(
-      providers: StaticProvider[], readonly parent: Injector, readonly source: string|null,
+      providers: Provider[], readonly parent: Injector, readonly source: string|null,
       readonly scopes: Set<InjectorScope>) {
     super();
     // Start off by creating Records for every provider.

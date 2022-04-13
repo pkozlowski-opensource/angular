@@ -6,10 +6,10 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {StaticProvider} from '../di';
 import {Injector} from '../di/injector';
 import {INJECTOR} from '../di/injector_token';
 import {InjectFlags} from '../di/interface/injector';
+import {Provider} from '../di/interface/provider';
 import {createInjectorWithoutInjectorInstances, EnvInjector, getNullInjector, R3Injector} from '../di/r3_injector';
 import {Type} from '../interface/type';
 import {ComponentFactoryResolver as viewEngine_ComponentFactoryResolver} from '../linker/component_factory_resolver';
@@ -113,7 +113,7 @@ class EnvNgModuleRefAdapter implements viewEngine_NgModuleRef<null> {
   readonly componentFactoryResolver: ComponentFactoryResolver = new ComponentFactoryResolver(this);
   readonly instance = null;
 
-  constructor(providers: StaticProvider[], parent: EnvInjector|null, source: string|null) {
+  constructor(providers: Provider[], parent: EnvInjector|null, source: string|null) {
     const injector = new R3Injector(
         [
           ...providers,
@@ -139,7 +139,7 @@ class EnvNgModuleRefAdapter implements viewEngine_NgModuleRef<null> {
  * @publicApi
  */
 export function createEnvInjector(
-    providers: StaticProvider[], parent: EnvInjector|null = null,
+    providers: Provider[], parent: EnvInjector|null = null,
     debugName: string|null = null): EnvInjector {
   const adapter = new EnvNgModuleRefAdapter(providers, parent, debugName);
   return adapter.injector;
