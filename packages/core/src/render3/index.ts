@@ -139,7 +139,7 @@ export {CssSelectorList, ProjectionSlots} from './interfaces/projection';
 export {
   setClassMetadata,
 } from './metadata';
-export {NgModuleFactory, NgModuleRef} from './ng_module_ref';
+export {NgModuleFactory, NgModuleRef, createEnvInjector} from './ng_module_ref';
 export {
   ɵɵpipe,
   ɵɵpipeBind1,

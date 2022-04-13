@@ -5,11 +5,10 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {EnvInjector, Injectable, Provider, StaticProvider} from '../../di';
+import {EnvInjector} from '../../di';
 import {inject} from '../../di/injector_compatibility';
 import {ɵɵdefineInjectable as defineInjectable} from '../../di/interface/defs';
-import {createInjectorWithoutInjectorInstances, importProvidersFrom, R3Injector, walkProviderTree} from '../../di/r3_injector';
-import {Type} from '../../interface/type';
+import {importProvidersFrom} from '../../di/r3_injector';
 import {OnDestroy} from '../../metadata';
 import {stringify} from '../../util/stringify';
 import {ComponentDef, DependencyTypeList, TypeOrFactory} from '../interfaces/definition';

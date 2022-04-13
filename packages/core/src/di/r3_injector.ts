@@ -55,7 +55,6 @@ const CIRCULAR = {};
  * Special token that allows attaching a custom logic that would be invoked once an injector is
  * created by the framework.
  */
-// TODO: make it a public API
 export const INJECTOR_INITIALIZER = new InjectionToken<() => void>('INJECTOR_INITIALIZER');
 
 /**
