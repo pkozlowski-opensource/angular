@@ -8,15 +8,15 @@
 
 import {CommonModule} from '@angular/common';
 import {Attribute, ChangeDetectorRef, Component, ComponentFactoryResolver, ComponentRef, Directive, ElementRef, EventEmitter, forwardRef, Host, HostBinding, Inject, Injectable, InjectFlags, InjectionToken, INJECTOR, Injector, Input, LOCALE_ID, NgModule, NgZone, Optional, Output, Pipe, PipeTransform, Self, SkipSelf, TemplateRef, ViewChild, ViewContainerRef, ViewRef, ɵDEFAULT_LOCALE_ID as DEFAULT_LOCALE_ID} from '@angular/core';
-import {StaticProvider, ɵINJECTOR_SCOPE} from '@angular/core/src/core';
+import {Provider, StaticProvider, ɵINJECTOR_SCOPE} from '@angular/core/src/core';
 import {importProvidersFrom, INJECTOR_INITIALIZER} from '@angular/core/src/di/r3_injector';
 import {ViewRef as ViewRefInternal} from '@angular/core/src/render3/view_ref';
 import {TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {BehaviorSubject} from 'rxjs';
 
-const findProvidersWithToken = (providers: StaticProvider[], token: InjectionToken<unknown>):
-    StaticProvider[] => {
+const findProvidersWithToken = (providers: Provider[], token: InjectionToken<unknown>):
+    Provider[] => {
       return providers.filter(provider => (provider as any).provide === token);
     }
 
