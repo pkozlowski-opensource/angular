@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Component, NgModule} from '@angular/core';
+import {Component, Directive, NgModule, Pipe, PipeTransform} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 
 describe('standalone components, directives and pipes', () => {
@@ -73,5 +73,59 @@ describe('standalone components, directives and pipes', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.innerHTML)
         .toEqual('Outer<inner-cmp>Inner(Service)</inner-cmp>Service');
+  });
+
+  it('should allow exporting standalone components, directives and pipes from NgModule', () => {
+    @Component({
+      selector: 'standalone-cmpt',
+      standalone: true,
+      template: `standalone`,
+    })
+    class StaandaloneComponent {
+    }
+
+    @Directive({
+      selector: '[standalone-dir]',
+      host: {
+        '[attr.id]': '"standalone"',
+      },
+      standalone: true
+    })
+    class StandaloneDirective {
+    }
+
+    @Pipe({name: 'standalonePipe', standalone: true})
+    class StandalonePipe implements PipeTransform {
+      transform(value: any) {
+        return `|${value}`;
+      }
+    }
+
+    @NgModule({
+      imports: [StaandaloneComponent, StandaloneDirective, StandalonePipe],
+      exports: [StaandaloneComponent, StandaloneDirective, StandalonePipe],
+    })
+    class LibModule {
+    }
+
+    @Component({
+      selector: 'app-cmpt',
+      template:
+          `<standalone-cmpt standalone-dir></standalone-cmpt>{{'standalone' | standalonePipe}}`,
+    })
+    class AppComponent {
+    }
+
+    TestBed.configureTestingModule({
+      imports: [LibModule],
+      declarations: [AppComponent],
+    });
+
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toBe('standalone|standalone');
+    expect(fixture.nativeElement.querySelector('standalone-cmpt').getAttribute('id'))
+        .toBe('standalone');
   });
 });
