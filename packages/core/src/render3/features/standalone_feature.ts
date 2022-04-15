@@ -14,7 +14,11 @@ import {stringify} from '../../util/stringify';
 import {ComponentDef, DependencyTypeList, TypeOrFactory} from '../interfaces/definition';
 import {createEnvInjector} from '../ng_module_ref';
 
-// TODO(pk): document
+/**
+ * A service used by the framework to create instances of standalone injectors. Those injectors are
+ * created on demand in case of dynamic component instantiation and contain ambient providers
+ * collected from the imports graph rooted at a given standalone component.
+ */
 export class StandaloneService implements OnDestroy {
   cachedInjectors = new Map<ComponentDef<unknown>, EnvInjector>();
 
@@ -63,7 +67,12 @@ export class StandaloneService implements OnDestroy {
 }
 
 /**
- * TODO(pk): documentation
+ * A feature that acts as a setup code for the {@see StandaloneService}.
+ *
+ * The most important responsaibility of this feature is to expose the "getStandaloneInjector"
+ * function (an entry points to a standalone injector creation) on a component definition object. We
+ * go through the features infrastructure to make sure that the standalone injector creation logic
+ * is tree-shakable and not included in applications that don't use standalone components.
  *
  * @codeGenApi
  */

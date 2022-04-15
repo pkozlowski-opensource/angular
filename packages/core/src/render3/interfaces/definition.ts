@@ -317,10 +317,19 @@ export interface ComponentDef<T> extends DirectiveDef<T> {
    */
   tView: TView|null;
 
-  // TODO(pk): document
+  /**
+   * A function added by the {@see ɵɵStandaloneFeature} and used by the framework to create standalone injectors.
+   */
   getStandaloneInjector: ((parentInjector: EnvInjector) => EnvInjector | null)|null;
 
-  // TODO(pk): document
+  /**
+   * Registry of directives, components, and pipes that may be found in this component's view.
+   *
+   * The full list of dependencies is stored so we can traverse the entire dependency graph, extract
+   * providers and ultimatelly create standalone injectors. This property is either an array of
+   * types or a function that returns the array of types. This function may be necessary to support
+   * forward declarations.
+   */
   dependencies: (() => DependencyTypeList)|null;
 
   /**
