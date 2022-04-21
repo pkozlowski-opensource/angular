@@ -7,7 +7,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {Component, Directive, Input, NgModule, Pipe, PipeTransform} from '@angular/core';
+import {Component, Directive, forwardRef, Input, NgModule, Pipe, PipeTransform} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 
 describe('standalone components, directives and pipes', () => {
@@ -215,5 +215,52 @@ describe('standalone components, directives and pipes', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.innerHTML)
         .toEqual('Outer<inner-cmp>Inner(Service)</inner-cmp>Service');
+  });
+
+  it('should collect ambient providers from exported NgModule', () => {
+    class Service {
+      value = 'service';
+    }
+
+    @NgModule({providers: [Service]})
+    class ModuleWithAService {
+    }
+
+    @NgModule({exports: [ModuleWithAService]})
+    class ExportingModule {
+    }
+
+    @Component({
+      selector: 'standalone',
+      standalone: true,
+      imports: [ExportingModule],
+      template: `({{service.value}})`
+    })
+    class TestComponent {
+      constructor(readonly service: Service) {}
+    }
+
+    const fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toBe('(service)');
+  });
+
+  it('should support forwardRef imports', () => {
+    @Component({
+      selector: 'test',
+      standalone: true,
+      imports: [forwardRef(() => StandaloneComponent)],
+      template: `(<other-standalone></other-standalone>)`
+    })
+    class TestComponent {
+    }
+
+    @Component({selector: 'other-standalone', standalone: true, template: `standalone component`})
+    class StandaloneComponent {
+    }
+
+    const fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toBe('(standalone component)');
   });
 });
