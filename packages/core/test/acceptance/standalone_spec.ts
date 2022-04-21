@@ -393,4 +393,37 @@ describe('standalone components, directives and pipes', () => {
         .toThrowError(
             'A module with providers was imported from "StandaloneCmp". Modules with providers are not supported in stnadalone components imports.');
   });
+
+  it('should deal with cycles', () => {
+    @Component({
+      selector: 'cmp-a',
+      standalone: true,
+      template: '<ng-template [ngIf]="false"><cmp-c></cmp-c></ng-template>A',
+      imports: [forwardRef(() => StandaloneCmpC)],
+    })
+    class StandaloneCmpA {
+    }
+
+    @Component({
+      selector: 'cmp-b',
+      standalone: true,
+      template: '(<cmp-a></cmp-a>)B',
+      imports: [StandaloneCmpA],
+    })
+    class StandaloneCmpB {
+    }
+
+    @Component({
+      selector: 'cmp-c',
+      standalone: true,
+      template: '(<cmp-b></cmp-b>)C',
+      imports: [StandaloneCmpB],
+    })
+    class StandaloneCmpC {
+    }
+
+    const fixture = TestBed.createComponent(StandaloneCmpC);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toBe('((A)B)C');
+  });
 });
