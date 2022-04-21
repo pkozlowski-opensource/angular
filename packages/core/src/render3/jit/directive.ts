@@ -27,6 +27,7 @@ import {stringifyForError} from '../util/stringify_utils';
 import {angularCoreEnv} from './environment';
 import {getJitOptions} from './jit_options';
 import {flushModuleScopingQueueAsMuchAsPossible, patchComponentDefWithScope, transitiveScopesFor} from './module';
+import {isModuleWithProviders} from './util';
 
 /**
  * Keep track of the compilation depth to avoid reentrancy issues during JIT compilation. This
@@ -118,7 +119,7 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
 
           // And might have other dependencies in scope, depending on `imports`.
           if (metadata.imports) {
-            declarations.push(...getStandaloneDependencies(flatten(metadata.imports)));
+            declarations.push(...getStandaloneDependencies(flatten(metadata.imports), type));
           }
         } else {
           // NgModule-based components are processed first with empty `declarations`, since when the
@@ -179,13 +180,22 @@ export function compileComponent(type: Type<any>, metadata: Component): void {
   });
 }
 
-function getStandaloneDependencies(imports: Type<any>[]): R3TemplateDependencyFacade[] {
+function getDependencyTypeForError(type: Type<any>) {
+  if (getComponentDef(type)) return 'component';
+  if (getDirectiveDef(type)) return 'directive';
+  if (getPipeDef(type)) return 'pipe';
+  return 'type';
+}
+
+function getStandaloneDependencies(
+    imports: Type<any>[], importingType: Type<any>): R3TemplateDependencyFacade[] {
   const dependencies: R3TemplateDependencyFacade[] = [];
   for (const rawDep of imports) {
     const dep = resolveForwardRef(rawDep);
     if (!dep) {
-      // TODO: real error
-      throw new Error(`ForwardRef issue?`);
+      throw new Error(`Expected forwardRef function, imported from "${
+          stringifyForError(importingType)}", to return a standalone entity or NgModule but got "${
+          stringifyForError(dep) || dep}".`);
     }
     const ngModuleDef: NgModuleDef<any>|null = getNgModuleDef(dep);
     if (ngModuleDef) {
@@ -208,20 +218,32 @@ function getStandaloneDependencies(imports: Type<any>[]): R3TemplateDependencyFa
           type: dir,
         } as R3TemplateDependencyFacade);
       }
-    }
+    } else {
+      const dirDef = getComponentDef(dep) || getDirectiveDef(dep);
+      const anyDef = dirDef || getPipeDef(dep);
+      if (anyDef) {
+        if (!anyDef.standalone) {
+          throw new Error(`The "${stringifyForError(dep)}" ${
+              getDependencyTypeForError(dep)}, imported from "${
+              stringifyForError(
+                  importingType)}", is not standalone. Did you forget to add the standalone: true flag?`);
+        }
 
-    const dirDef = getComponentDef(dep) || getDirectiveDef(dep);
-    const anyDef = dirDef || getPipeDef(dep);
-    if (anyDef) {
-      if (!anyDef.standalone) {
-        // TODO: real error
-        throw new Error(`What are you doing? You imported a non-standalone thing!`);
+        dependencies.push({
+          kind: dirDef ? R3TemplateDependencyKind.Directive : R3TemplateDependencyKind.Pipe,
+          type: dep,
+        } as R3TemplateDependencyFacade);
+      } else {
+        if (isModuleWithProviders(dep)) {
+          throw new Error(`A module with providers was imported from "${
+              stringifyForError(
+                  importingType)}". Modules with providers are not supported in stnadalone components imports.`);
+        } else {
+          throw new Error(`The "${stringifyForError(dep)}" type, imported from "${
+              stringifyForError(
+                  importingType)}", must be a standalone component / directive / pipe or a NgModule. Did you forget to add the required @Component / @Directive / @Pipe or @NgModule annotation?`);
+        }
       }
-
-      dependencies.push({
-        kind: dirDef ? R3TemplateDependencyKind.Directive : R3TemplateDependencyKind.Pipe,
-        type: dep,
-      } as R3TemplateDependencyFacade);
     }
   }
   return dependencies;
