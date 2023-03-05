@@ -74,7 +74,7 @@ const queuedWatches = new Set<Watch>();
 let watchQueuePromise: {promise: Promise<void>; resolveFn: () => void;}|null = null;
 
 function queueWatch(watch: Watch): void {
-  if (queuedWatches.has(watch) || !globalWatches.has(watch)) {
+  if (!globalWatches.has(watch)) {
     return;
   }
 
@@ -97,9 +97,9 @@ function queueWatch(watch: Watch): void {
 
 function runWatchQueue(): void {
   for (const watch of queuedWatches) {
-    queuedWatches.delete(watch);
     watch.run();
   }
+  queuedWatches.clear();
 
   watchQueuePromise!.resolveFn();
   watchQueuePromise = null;
