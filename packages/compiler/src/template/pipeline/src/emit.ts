@@ -36,6 +36,7 @@ import {phaseSlotAllocation} from './phases/slot_allocation';
 import {phaseVarCounting} from './phases/var_counting';
 import {phaseVariableOptimization} from './phases/variable_optimization';
 import {phaseExpandSafeReads} from './phases/expand_safe_reads';
+import {phaseCreationVarColocation} from './phases/creation_var_colocation';
 
 /**
  * Run all transformation phases in the correct order against a `ComponentCompilation`. After this
@@ -59,6 +60,7 @@ export function transformTemplate(cpl: ComponentCompilation): void {
   phaseGenerateAdvance(cpl);
   phaseNaming(cpl);
   phaseVariableOptimization(cpl, {conservative: true});
+  phaseCreationVarColocation(cpl);
   phaseMergeNextContext(cpl);
   phaseNgContainer(cpl);
   phaseEmptyElements(cpl);
