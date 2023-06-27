@@ -33,6 +33,32 @@ describe('dom property bindings in signal based components', () => {
     fixture.detectChanges();
     expect(div.tabIndex).toBe(5);
   });
+
+  it('should not update DOM binding if a binding is not reactive', () => {
+    @Component({
+      signals: true,
+      template: `<div [tabindex]="nonReactive()">{{unrelated()}}</div>`,
+      standalone: true,
+    })
+    class App {
+      _idx = 0;
+      nonReactive() {
+        return this._idx++;
+      }
+      unrelated = signal('foo');
+    }
+
+    const fixture = TestBed.createComponent(App);
+    const cmpInstance = fixture.componentInstance;
+    const div = fixture.nativeElement.firstChild;
+
+    fixture.detectChanges();
+    expect(div.tabIndex).toBe(0);
+
+    cmpInstance.unrelated.set('bar');
+    fixture.detectChanges();
+    expect(div.tabIndex).toBe(0);
+  });
 });
 
 describe('dom property interpolation in signal based components', () => {
