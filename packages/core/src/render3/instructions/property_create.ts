@@ -18,6 +18,7 @@ import {SanitizerFn} from '../interfaces/sanitization';
 import {isComponentHost} from '../interfaces/type_checks';
 import {HEADER_OFFSET, RENDERER} from '../interfaces/view';
 import {getCurrentTNode, getLView, getSelectedTNode, getTView, nextBindingIndex} from '../state';
+import {renderStringify} from '../util/stringify_utils';
 import {getNativeByTNode} from '../util/view_utils';
 
 import {handleUnknownPropertyError, isPropertyValid} from './element_validation';
@@ -164,4 +165,8 @@ export function propertyUpdateInput(
   if (ngDevMode) {
     setNgReflectProperties(lView, element, tNode.type, targets, value);
   }
+}
+
+export function ɵɵpropertyInterpolateStringify(value: any): string {
+  return renderStringify(value);
 }

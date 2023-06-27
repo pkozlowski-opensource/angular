@@ -150,6 +150,7 @@ export {
   ɵɵpropertyInterpolate6,
   ɵɵpropertyInterpolate7,
   ɵɵpropertyInterpolate8,
+  ɵɵpropertyInterpolateStringify,
   ɵɵpropertyInterpolateV,
   ɵɵProvidersFeature,
   ɵɵHostDirectivesFeature,
