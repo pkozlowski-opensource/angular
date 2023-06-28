@@ -8,23 +8,24 @@
 
 // clang-format off
 export {
-  computed,
+  CreateEffectOptions,
+  EffectCleanupFn,
+  EffectRef,
+  effect
+} from './render3/reactivity/effect';
+export {input} from './render3/reactivity/input';
+export {InputSignal, ModelSignal} from './render3/reactivity/input_signal';
+export {viewChild, viewChildren} from './render3/reactivity/queries';
+export {
   CreateComputedOptions,
   CreateSignalOptions,
-  isSignal,
   Signal,
-  signal,
-  untracked,
   ValueEqualityFn,
   WritableSignal,
-  ɵɵtoWritableSignal,
+  computed,
+  isSignal,
+  signal,
+  untracked,
+  ɵɵtoWritableSignal
 } from './signals';
-export {
-  CreateEffectOptions,
-  effect,
-  EffectRef,
-  EffectCleanupFn,
-} from './render3/reactivity/effect';
-export {InputSignal, ModelSignal} from './render3/reactivity/input_signal';
-export {input} from './render3/reactivity/input';
 // clang-format on

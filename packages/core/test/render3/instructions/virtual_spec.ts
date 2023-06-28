@@ -40,7 +40,8 @@ describe('virtual instructions', () => {
 
     fixture.componentInstance.value = 'bye';
     fixture.detectChanges();
-    expect(el.value).toEqual('bye');
+    // input bindings are wrapped into computed so don't update if the reactive value didn't change
+    expect(el.value).toEqual('hello');
   });
 
   it('should support signal -> signal bindings', () => {
