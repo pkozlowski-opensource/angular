@@ -63,10 +63,6 @@ const ERRORED: any = Symbol('ERRORED');
 class ComputedImpl<T> extends ReactiveNode {
   constructor(private computation: () => T, private equal: (oldValue: T, newValue: T) => boolean) {
     super();
-    if (!this.producerReactiveNodesCreationAllowed) {
-      throw new Error(
-          'A new computed signal creation is disallowed in the current reactive context.');
-    }
   }
   /**
    * Current value of the computation.

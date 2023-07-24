@@ -92,6 +92,13 @@ interface ReactiveEdge {
  * last observed.
  */
 export abstract class ReactiveNode {
+  constructor() {
+    if (!this.producerReactiveNodesCreationAllowed) {
+      throw new Error(
+          'The current reactive context (usually a computed or an effect) disallow creation of new signals while it is running.');
+    }
+  }
+
   private readonly id = _nextReactiveId++;
 
   /**
