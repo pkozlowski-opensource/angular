@@ -7,7 +7,8 @@
  */
 
 
-import {ɵɵconditional, ɵɵdefineComponent, ɵɵtemplate, ɵɵtext, ɵɵtextInterpolate} from '@angular/core';
+import {TrackByFunction, ɵɵconditional, ɵɵdefineComponent, ɵɵtemplate, ɵɵtext, ɵɵtextInterpolate, ɵɵtextInterpolate2} from '@angular/core';
+import {RepeaterContext, ɵɵrepeater, ɵɵrepeaterCreate, ɵɵrepeaterTrackByIdentity, ɵɵrepeaterTrackByIndex} from '@angular/core/src/render3/instructions/control_flow';
 import {TestBed} from '@angular/core/testing';
 
 describe('control flow', () => {
@@ -174,9 +175,6 @@ describe('control flow', () => {
                 }
                 if (rf & 2) {
                   const expValue = ctx.case;
-                  // Open question: == vs. === for comparison
-                  // == is the current Angular implementation
-                  // === is used by JavaScript semantics
                   ɵɵconditional(0, expValue === 0 ? 0 : expValue === 1 ? 1 : 2);
                 }
               },
@@ -199,6 +197,202 @@ describe('control flow', () => {
       fixture.componentInstance.case = 5;
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('default');
+    });
+  });
+
+  describe('for', () => {
+    it('should create, remove and move views corresponding to items in a collection', () => {
+      function App_ng_template_0_Template(rf: number, ctx: RepeaterContext<any>) {
+        if (rf & 1) {
+          ɵɵtext(0);
+        }
+        if (rf & 2) {
+          const item = ctx.$implicit;
+          const idx = ctx.index;
+          ɵɵtextInterpolate2('', item, '(', idx, ')|');
+        }
+      }
+
+      const App_ng_template_0_TrackBy: TrackByFunction<number> = ɵɵrepeaterTrackByIdentity;
+
+      class TestComponent {
+        items = [1, 2, 3];
+
+        static ɵcmp = ɵɵdefineComponent({
+          type: TestComponent,
+          selectors: [['some-cmp']],
+          decls: 1,
+          vars: 1,
+
+          // {#for (item of items); track item; let idx = index}{{item}}|{/for}
+          template:
+              function TestComponent_Template(rf: number, ctx: any) {
+                if (rf & 1) {
+                  // QUESTION: fundamental mismatch between the "template" and "container" concepts
+                  // those 2 calls to the ɵɵtemplate instruction will generate comment nodes and
+                  // LContainer
+                  ɵɵtemplate(0, App_ng_template_0_Template, 1, 2);
+                  ɵɵrepeaterCreate(1, App_ng_template_0_TrackBy);
+                }
+
+                if (rf & 2) {
+                  ɵɵrepeater(0, ctx.items);
+                }
+              },
+          encapsulation: 2
+        });
+        static ɵfac = function TestComponent_Factory(t: any) {
+          return new (t || TestComponent)();
+        };
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+      fixture.componentInstance.items.pop();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|');
+
+      fixture.componentInstance.items.push(3);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+      fixture.componentInstance.items[0] = 3;
+      fixture.componentInstance.items[2] = 1;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('3(0)|2(1)|1(2)|');
+    });
+
+    it('should work correctly with trackBy index', () => {
+      function App_ng_template_0_Template(rf: number, ctx: RepeaterContext<any>) {
+        if (rf & 1) {
+          ɵɵtext(0);
+        }
+        if (rf & 2) {
+          const item = ctx.$implicit;
+          const idx = ctx.index;
+          ɵɵtextInterpolate2('', item, '(', idx, ')|');
+        }
+      }
+
+      const App_ng_template_0_TrackBy: TrackByFunction<number> = ɵɵrepeaterTrackByIndex;
+
+      class TestComponent {
+        items = [1, 2, 3];
+
+        static ɵcmp = ɵɵdefineComponent({
+          type: TestComponent,
+          selectors: [['some-cmp']],
+          decls: 1,
+          vars: 1,
+
+          // {#for (item of items); track index; let idx = index}{{item}}|{/for}
+          template:
+              function TestComponent_Template(rf: number, ctx: any) {
+                if (rf & 1) {
+                  // QUESTION: fundamental mismatch between the "template" and "container" concepts
+                  // those 2 calls to the ɵɵtemplate instruction will generate comment nodes and
+                  // LContainer
+                  ɵɵtemplate(0, App_ng_template_0_Template, 1, 2);
+                  ɵɵrepeaterCreate(1, App_ng_template_0_TrackBy);
+                }
+
+                if (rf & 2) {
+                  ɵɵrepeater(0, ctx.items);
+                }
+              },
+          encapsulation: 2
+        });
+        static ɵfac = function TestComponent_Factory(t: any) {
+          return new (t || TestComponent)();
+        };
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+      fixture.componentInstance.items.pop();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|');
+
+      fixture.componentInstance.items.push(3);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+      fixture.componentInstance.items[0] = 3;
+      fixture.componentInstance.items[2] = 1;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('3(0)|2(1)|1(2)|');
+    });
+
+    it('should support empty blocks', () => {
+      function App_ng_template_0_Template(rf: number) {
+        if (rf & 1) {
+          ɵɵtext(0, '|');
+        }
+      }
+
+      function App_ng_template_0_EMPTY(rf: number) {
+        if (rf & 1) {
+          ɵɵtext(0, 'Empty');
+        }
+      }
+
+      const App_ng_template_0_TrackBy: TrackByFunction<number> = ɵɵrepeaterTrackByIndex;
+
+      class TestComponent {
+        items: number[]|null|undefined = [1, 2, 3];
+
+        static ɵcmp = ɵɵdefineComponent({
+          type: TestComponent,
+          selectors: [['some-cmp']],
+          decls: 2,
+          vars: 1,
+
+          // {#for (item of items); track index; let idx = index}{{item}}|{/for}
+          template:
+              function TestComponent_Template(rf: number, ctx: any) {
+                if (rf & 1) {
+                  ɵɵtemplate(0, App_ng_template_0_Template, 1, 0);
+                  ɵɵtemplate(1, App_ng_template_0_EMPTY, 1, 0);
+                  ɵɵrepeaterCreate(2, App_ng_template_0_TrackBy);
+                }
+                if (rf & 2) {
+                  ɵɵrepeater(0, ctx.items, 1);
+                }
+              },
+          encapsulation: 2
+        });
+        static ɵfac = function TestComponent_Factory(t: any) {
+          return new (t || TestComponent)();
+        };
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('|||');
+
+      fixture.componentInstance.items = [];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
+
+      fixture.componentInstance.items = [0, 1];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('||');
+
+      fixture.componentInstance.items = null;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
+
+      fixture.componentInstance.items = [0];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('|');
+
+      fixture.componentInstance.items = undefined;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
     });
   });
 });
