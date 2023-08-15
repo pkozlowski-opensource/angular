@@ -6,10 +6,14 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {ɵɵtemplate} from '@angular/core';
+
 import {DefaultIterableDiffer, IterableChangeRecord, TrackByFunction} from '../../change_detection';
+import {assertDefined} from '../../util/assert';
 import {assertLContainer, assertLView, assertTNode} from '../assert';
 import {bindingUpdated} from '../bindings';
 import {CONTAINER_HEADER_OFFSET, LContainer} from '../interfaces/container';
+import {ComponentTemplate} from '../interfaces/definition';
 import {TNode} from '../interfaces/node';
 import {CONTEXT, HEADER_OFFSET, LView, TVIEW, TView} from '../interfaces/view';
 import {detachView} from '../node_manipulation';
@@ -57,48 +61,11 @@ export function ɵɵconditional<T>(containerIndex: number, matchingTemplateIndex
   }
 }
 
-// THINK: this is duplicated with NgFor, can I share? Duplicate in the public-API surface isn't
-// great...
-// DESIGN: can I have the repeater context as an interface?
-export interface RepeaterContext<T> {
-  // THINK: the fact that $implicit and index is writable leaks implementation details
-  $implicit: T;
-  index: number;
+export class RepeaterContext<T> {
+  constructor(private lContainer: LContainer, public $implicit: T, public $index: number) {}
 
-  // THINK(pk): how do I express even / odd etc. in the new syntax: do I use $ as in the RFC or
-  // stick to the NgFor naming?
-  readonly count: number;
-  readonly first: boolean;
-  readonly last: boolean;
-  readonly even: boolean;
-  readonly odd: boolean;
-
-  // DESIGN: do I need to expose the list instance on the context?
-}
-
-// PERF(pk): it is inefficient to crate all fields without knowing if those would
-// be used at all - can we optimize?
-class RepeaterContextImpl<T> implements RepeaterContext<T> {
-  constructor(private lContainer: LContainer, public $implicit: T, public index: number) {}
-
-  get count(): number {
+  get $count(): number {
     return this.lContainer.length - CONTAINER_HEADER_OFFSET;
-  }
-
-  get first(): boolean {
-    return this.index === 0;
-  }
-
-  get last(): boolean {
-    return this.index === this.count - 1;
-  }
-
-  get even(): boolean {
-    return this.index % 2 === 0;
-  }
-
-  get odd(): boolean {
-    return !this.even;
   }
 }
 
@@ -110,10 +77,33 @@ export function ɵɵrepeaterTrackByIdentity<T>(_: number, value: T) {
   return value;
 }
 
-export function ɵɵrepeaterCreate<T>(bindingIndex: number, trackByFn: TrackByFunction<T>): void {
+interface RepeaterMetadata<T> {
+  hasEmptyBlock: boolean;
+  differ: DefaultIterableDiffer<T>;
+}
+
+export function ɵɵrepeaterCreate<T>(
+    index: number, templateFn: ComponentTemplate<any>, decls: number, vars: number,
+    trackByFn: TrackByFunction<T>, emptyTemplateFn?: ComponentTemplate<any>, emptyDecls?: number,
+    emptyVars?: number): void {
+  ɵɵtemplate(index, templateFn, decls, vars);
+
+  const hasEmptyBlock = emptyTemplateFn !== undefined;
+  if (hasEmptyBlock) {
+    ngDevMode &&
+        assertDefined(emptyDecls, 'Missing number of declarations for the empty repeater block.');
+    ngDevMode &&
+        assertDefined(emptyVars, 'Missing number of bindings for the empty repeater block.');
+
+    ɵɵtemplate(index + 1, emptyTemplateFn, decls, vars);
+  }
+
   const hostLView = getLView();
-  // Store differ and its corresponding TrackBy function in a binding slot.
-  hostLView[HEADER_OFFSET + bindingIndex] = new DefaultIterableDiffer(trackByFn);
+  const metadata: RepeaterMetadata<T> = {
+    hasEmptyBlock: emptyTemplateFn !== undefined,
+    differ: new DefaultIterableDiffer(trackByFn),
+  };
+  hostLView[HEADER_OFFSET + (hasEmptyBlock ? 2 : 1)] = metadata;
 }
 
 
@@ -122,34 +112,28 @@ export function ɵɵrepeaterCreate<T>(bindingIndex: number, trackByFn: TrackByFu
  */
 // TODO: exact type for the collection? Should be the same as NgFor, right? Need the U type?
 export function ɵɵrepeater<T>(
-    containerIndex: number, collection: Iterable<T>|undefined|null,
-    fallbackTemplateIdx?: number): void {
+    metadataSlotIdx: number, collection: Iterable<T>|undefined|null): void {
   const hostLView = getLView();
   const hostTView = hostLView[TVIEW];
-  const bindingIndex = nextBindingIndex();
-  const containerAdjustedIndex = HEADER_OFFSET + containerIndex;
+  const metadata = hostLView[HEADER_OFFSET + metadataSlotIdx] as RepeaterMetadata<T>;
+  const containerAdjustedIndex =
+      HEADER_OFFSET + metadataSlotIdx + (metadata.hasEmptyBlock ? -2 : -1);
 
-  const tContainer = getTNode(hostTView, containerAdjustedIndex);
-  ngDevMode && assertTNode(tContainer);
-
-  // THINK: do I need to re-create differ when the collection object identity changes? I would
-  // assume not...
-  // TODO: assert that I got the differ
-  const differ = hostLView[bindingIndex] as DefaultIterableDiffer<T>;
+  const tContainer = getExistingTNode(hostTView, containerAdjustedIndex - HEADER_OFFSET);
+  const differ = metadata.differ;
 
   const prevLen = differ.length;
   const changes = differ.diff(collection);
   const newLen = differ.length;
 
   // remove empty block if needed
-  if (fallbackTemplateIdx !== undefined && prevLen === 0 && newLen > 0) {
+  if (metadata.hasEmptyBlock && prevLen === 0 && newLen > 0) {
     const lContainer = getLContainer(hostLView, containerAdjustedIndex);
     removeLViewFromLContainer(lContainer, 0);
   }
 
   if (changes !== null) {
     const lContainer = getLContainer(hostLView, containerAdjustedIndex);
-    // PERF: could make it a bit smarter by skipping add / remove operations at the end?
     let needsIndexUpdate = false;
     changes.forEachOperation(
         (item: IterableChangeRecord<T>, adjustedPreviousIndex: number|null,
@@ -158,7 +142,7 @@ export function ɵɵrepeater<T>(
             // add
             const newViewIdx = adjustToLastLContainerIndex(lContainer, currentIndex);
             const embeddedLView = createAndRenderEmbeddedLView(
-                hostLView, tContainer, new RepeaterContextImpl(lContainer, item.item, newViewIdx));
+                hostLView, tContainer, new RepeaterContext(lContainer, item.item, newViewIdx));
             addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
             needsIndexUpdate = true;
           } else if (currentIndex == null) {
@@ -191,24 +175,20 @@ export function ɵɵrepeater<T>(
       for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
         const lView = getExistingLViewFromLContainer<RepeaterContext<T>>(lContainer, i);
         const ctx = lView[CONTEXT];
-        ctx.index = i;
+        ctx.$index = i;
       }
     }
   }
 
   // add empty block if needed
-  if (fallbackTemplateIdx !== undefined && prevLen > 0 && newLen === 0) {
+  if (metadata.hasEmptyBlock && prevLen > 0 && newLen === 0) {
     const lContainer = getLContainer(hostLView, containerAdjustedIndex);
-    const tNode = getTNode(hostTView, HEADER_OFFSET + fallbackTemplateIdx);
-    ngDevMode && assertTNode(tNode);
+    const tNode = getExistingTNode(hostTView, containerAdjustedIndex + 1 - HEADER_OFFSET);
     // DESIGN: anything in the context of this view?
     const embeddedLView = createAndRenderEmbeddedLView(hostLView, tNode, {});
     addLViewToLContainer(lContainer, embeddedLView, 0);
   }
 }
-
-// utility functions
-// TODO(pk): those are probably generic enough to move to the fwk's core
 
 function getLContainer(lView: LView, index: number): LContainer {
   const lContainer = lView[index];
