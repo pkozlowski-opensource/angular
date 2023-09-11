@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {DefaultIterableDiffer, IterableChangeRecord, TrackByFunction} from '../../change_detection';
+import {DefaultIterableDiffer, TrackByFunction} from '../../change_detection';
 import {assertDefined} from '../../util/assert';
 import {assertLContainer, assertLView, assertTNode} from '../assert';
 import {bindingUpdated} from '../bindings';
@@ -14,7 +14,7 @@ import {CONTAINER_HEADER_OFFSET, LContainer} from '../interfaces/container';
 import {ComponentTemplate} from '../interfaces/definition';
 import {TNode} from '../interfaces/node';
 import {CONTEXT, DECLARATION_COMPONENT_VIEW, HEADER_OFFSET, LView, TVIEW, TView} from '../interfaces/view';
-import {detachView} from '../node_manipulation';
+import {destroyLView, detachView} from '../node_manipulation';
 import {getLView, nextBindingIndex} from '../state';
 import {getTNode} from '../util/view_utils';
 import {addLViewToLContainer, createAndRenderEmbeddedLView, getLViewFromLContainer, removeLViewFromLContainer} from '../view_manipulation';
@@ -144,6 +144,79 @@ export function ɵɵrepeaterCreate(
   }
 }
 
+// TODO: in reality we just need something like "array like"
+// TODO: this will be recursive, right? Just pass start / end indexes?
+function reconcile(
+    itemTemplateTNode: TNode, hostLView: LView, lContainer: LContainer,
+    collection: ReadonlyArray<unknown>, trackByFn: any, oldStartIdx: number, oldEndIdx: number,
+    newStartIdx: number, newEndIdx: number) {
+  // pointers to the indices in the respective collections
+
+  // THINK: seems like the trackBy function would be invoked on the same item multiple times
+  while (oldStartIdx < oldEndIdx && newStartIdx < newEndIdx) {
+    // compare from the beginning
+    const oldViewStart = getExistingLViewFromLContainer<RepeaterContext<unknown>>(
+        lContainer, oldStartIdx - CONTAINER_HEADER_OFFSET);
+    const newItemStart = collection[newStartIdx];
+    const oldKeyStart = trackByFn(oldViewStart[CONTEXT].$index, oldViewStart[CONTEXT].$implicit);
+    const newKeyStart = trackByFn(newStartIdx, newItemStart);
+    if (Object.is(oldKeyStart, newKeyStart)) {
+      oldStartIdx++;
+      newStartIdx++;
+      continue;
+    }
+
+    // compare from the end
+    // THINK: off-by-1 errors and CONTAINER_HEADER_OFFSET are really easy to get wrong -
+    // alternatives?
+    const oldViewEnd = getExistingLViewFromLContainer<RepeaterContext<unknown>>(
+        lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
+    const newItemEnd = collection[newEndIdx - 1];
+    const oldKeyEnd = trackByFn(oldViewEnd[CONTEXT].$index, oldViewEnd[CONTEXT].$implicit);
+    const newKeyEnd = trackByFn(newEndIdx, newItemEnd);
+    if (Object.is(oldKeyEnd, newKeyEnd)) {
+      newEndIdx--;
+      oldEndIdx--;
+      continue;
+    }
+
+    // swap?
+    // THINK: do I need to compare both ways?
+    if (newKeyStart === oldKeyEnd) {
+      swapViews(lContainer, newStartIdx, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
+      // THINK: other indices to adjust?
+      newStartIdx++;
+      newEndIdx--;
+      oldStartIdx++;
+      oldEndIdx--;
+      continue;
+    }
+  }
+
+  // more items in the collection => insert
+  while (newStartIdx < newEndIdx) {
+    const newViewIdx = adjustToLastLContainerIndex(lContainer, null);
+    // THINK: this is the part that needs abstracting
+    const embeddedLView = createAndRenderEmbeddedLView(
+        hostLView, itemTemplateTNode,
+        new RepeaterContext(lContainer, collection[newStartIdx], newViewIdx));
+    addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
+    newStartIdx++;
+  }
+
+  // more items in a container => delete
+  while (oldStartIdx < oldEndIdx) {
+    const lView = detachExistingView(lContainer, lContainer.length - CONTAINER_HEADER_OFFSET - 1);
+    destroyLView(lView[TVIEW], lView);
+    oldStartIdx++;
+  }
+
+  // TESTS to write:
+  // - duplicated keys => what should happen here? Careful - throwing in the dev mode is not
+  // sufficient as production data might change the equation
+  // - not an array => what should happen here? fallback to a different algo? Or just throw?
+}
+
 /**
  * The repeater instruction does update-time diffing of a provided collection (against the
  * collection seen previously) and maps changes in the collection to views structure (by adding,
@@ -158,63 +231,88 @@ export function ɵɵrepeater(
     metadataSlotIdx: number, collection: Iterable<unknown>|undefined|null): void {
   const hostLView = getLView();
   const hostTView = hostLView[TVIEW];
+  // TODO: metadata depends on the differ
   const metadata = hostLView[HEADER_OFFSET + metadataSlotIdx] as RepeaterMetadata;
+  const containerIndex = metadataSlotIdx + 1;
+  const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
 
-  const differ = metadata.differ;
-  const changes = differ.diff(collection);
+  // THINK: abstract this part!
+  let hasItemsInCollection = false;
 
-  // handle repeater changes
-  if (changes !== null) {
-    const containerIndex = metadataSlotIdx + 1;
+  if (Array.isArray(collection) || collection == null) {
     const itemTemplateTNode = getExistingTNode(hostTView, containerIndex);
-    const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
-    let needsIndexUpdate = false;
-    changes.forEachOperation(
-        (item: IterableChangeRecord<unknown>, adjustedPreviousIndex: number|null,
-         currentIndex: number|null) => {
-          if (item.previousIndex === null) {
-            // add
-            const newViewIdx = adjustToLastLContainerIndex(lContainer, currentIndex);
-            const embeddedLView = createAndRenderEmbeddedLView(
-                hostLView, itemTemplateTNode,
-                new RepeaterContext(lContainer, item.item, newViewIdx));
-            addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
-            needsIndexUpdate = true;
-          } else if (currentIndex === null) {
-            // remove
-            adjustedPreviousIndex = adjustToLastLContainerIndex(lContainer, adjustedPreviousIndex);
-            removeLViewFromLContainer(lContainer, adjustedPreviousIndex);
-            needsIndexUpdate = true;
-          } else if (adjustedPreviousIndex !== null) {
-            // move
-            const existingLView =
-                detachExistingView<RepeaterContext<unknown>>(lContainer, adjustedPreviousIndex);
-            addLViewToLContainer(lContainer, existingLView, currentIndex);
-            needsIndexUpdate = true;
-          }
-        });
-
-    // A trackBy function might return the same value even if the underlying item changed - re-bind
-    // it in the context.
-    changes.forEachIdentityChange((record: IterableChangeRecord<unknown>) => {
-      const viewIdx = adjustToLastLContainerIndex(lContainer, record.currentIndex);
-      const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, viewIdx);
-      lView[CONTEXT].$implicit = record.item;
-    });
-
-    // moves in the container might caused context's index to get out of order, re-adjust
-    if (needsIndexUpdate) {
-      for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
-        const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
-        lView[CONTEXT].$index = i;
-      }
-    }
+    const collectionLen = collection != null ? collection.length : 0;
+    hasItemsInCollection = collectionLen > 0;
+    reconcile(
+        itemTemplateTNode, hostLView, lContainer, collection ?? [],
+        (_: number, item: unknown) => item, CONTAINER_HEADER_OFFSET, lContainer.length, 0,
+        collectionLen);
   }
 
-  // handle empty blocks
-  const bindingIndex = nextBindingIndex();
+  // PERF: blasting through the whole collection isn't great - can I adjust those in-place?
+  for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
+    const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
+    lView[CONTEXT].$index = i;
+  }
+
+
+  /*   const differ = metadata.differ;
+    const changes = differ.diff(collection);
+
+    // handle repeater changes
+    if (changes !== null) {
+      const containerIndex = metadataSlotIdx + 1;
+      const itemTemplateTNode = getExistingTNode(hostTView, containerIndex);
+      const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
+      let needsIndexUpdate = false;
+      changes.forEachOperation(
+          (item: IterableChangeRecord<unknown>, adjustedPreviousIndex: number|null,
+           currentIndex: number|null) => {
+            if (item.previousIndex === null) {
+              // add
+              const newViewIdx = adjustToLastLContainerIndex(lContainer, currentIndex);
+              const embeddedLView = createAndRenderEmbeddedLView(
+                  hostLView, itemTemplateTNode,
+                  new RepeaterContext(lContainer, item.item, newViewIdx));
+              addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
+              needsIndexUpdate = true;
+            } else if (currentIndex === null) {
+              // remove
+              adjustedPreviousIndex = adjustToLastLContainerIndex(lContainer,
+    adjustedPreviousIndex); removeLViewFromLContainer(lContainer, adjustedPreviousIndex);
+              needsIndexUpdate = true;
+            } else if (adjustedPreviousIndex !== null) {
+              // move
+              const existingLView =
+                  detachExistingView<RepeaterContext<unknown>>(lContainer, adjustedPreviousIndex);
+              addLViewToLContainer(lContainer, existingLView, currentIndex);
+              needsIndexUpdate = true;
+            }
+          });
+
+      // A trackBy function might return the same value even if the underlying item changed -
+    re-bind
+      // it in the context.
+      changes.forEachIdentityChange((record: IterableChangeRecord<unknown>) => {
+        const viewIdx = adjustToLastLContainerIndex(lContainer, record.currentIndex);
+        const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer,
+    viewIdx); lView[CONTEXT].$implicit = record.item;
+      });
+
+      // moves in the container might caused context's index to get out of order, re-adjust
+      if (needsIndexUpdate) {
+        for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
+          const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
+          lView[CONTEXT].$index = i;
+        }
+      }
+    }
+   */
+
+
+  // handle empty blocks if needed
   if (metadata.hasEmptyBlock) {
-    const hasItemsInCollection = differ.length > 0;
+    const bindingIndex = nextBindingIndex();
     if (bindingUpdated(hostLView, bindingIndex, hasItemsInCollection)) {
       const emptyTemplateIndex = metadataSlotIdx + 2;
       const lContainer = getLContainer(hostLView, HEADER_OFFSET + emptyTemplateIndex);
@@ -253,6 +351,16 @@ function getExistingLViewFromLContainer<T>(lContainer: LContainer, index: number
   ngDevMode && assertLView(existingLView);
 
   return existingLView!;
+}
+
+function swapViews(lContainer: LContainer, startIdx: number, endIdx: number) {
+  debugger;
+  const endView = detachExistingView(lContainer, endIdx);
+  const startView = detachExistingView(lContainer, startIdx);
+
+  // TODO: adjust index?
+  addLViewToLContainer(lContainer, endView, startIdx);
+  addLViewToLContainer(lContainer, startView, endIdx);
 }
 
 function getExistingTNode(tView: TView, index: number): TNode {

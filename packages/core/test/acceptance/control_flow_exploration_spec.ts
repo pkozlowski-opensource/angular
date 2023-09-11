@@ -244,7 +244,7 @@ describe('control flow', () => {
     });
   });
 
-  describe('for', () => {
+  fdescribe('for', () => {
     beforeEach(() => setEnabledBlockTypes(['for', 'if']));
     afterEach(() => setEnabledBlockTypes([]));
 
@@ -260,16 +260,20 @@ describe('control flow', () => {
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
 
+      // delete from the end
       fixture.componentInstance.items.pop();
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|');
 
+      // add at the end
       fixture.componentInstance.items.push(3);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
 
+      // swap at the start / end
       fixture.componentInstance.items[0] = 3;
       fixture.componentInstance.items[2] = 1;
+      debugger;
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('3(0)|2(1)|1(2)|');
     });
