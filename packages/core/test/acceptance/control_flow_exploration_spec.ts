@@ -273,7 +273,6 @@ describe('control flow', () => {
       // swap at the start / end
       fixture.componentInstance.items[0] = 3;
       fixture.componentInstance.items[2] = 1;
-      debugger;
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toBe('3(0)|2(1)|1(2)|');
     });
@@ -365,34 +364,34 @@ describe('control flow', () => {
       expect(offsetReads).toBeGreaterThan(prevReads);
     });
 
-    it('should be able to access component properties in the tracking function from a loop at the root of the template',
-       () => {
-         const calls: string[][] = [];
+    fit('should be able to access component properties in the tracking function from a loop at the root of the template',
+        () => {
+          const calls: string[][] = [];
 
-         @Component({
-           template: `{#for (item of items); track trackingFn(item, compProp)}{{item}}{/for}`,
-         })
-         class TestComponent {
-           items = ['one', 'two', 'three'];
-           compProp = 'hello';
+          @Component({
+            template: `{#for (item of items); track trackingFn(item, compProp)}{{item}}{/for}`,
+          })
+          class TestComponent {
+            items = ['one', 'two', 'three'];
+            compProp = 'hello';
 
-           trackingFn(item: string, message: string) {
-             calls.push([item, message]);
-             return item;
-           }
-         }
+            trackingFn(item: string, message: string) {
+              calls.push([item, message]);
+              return item;
+            }
+          }
 
-         const fixture = TestBed.createComponent(TestComponent);
-         fixture.detectChanges();
-         expect(calls).toEqual([
-           ['one', 'hello'],
-           ['two', 'hello'],
-           ['three', 'hello'],
-           ['one', 'hello'],
-           ['two', 'hello'],
-           ['three', 'hello'],
-         ]);
-       });
+          const fixture = TestBed.createComponent(TestComponent);
+          fixture.detectChanges();
+          expect(calls).toEqual([
+            ['one', 'hello'],
+            ['two', 'hello'],
+            ['three', 'hello'],
+            ['one', 'hello'],
+            ['two', 'hello'],
+            ['three', 'hello'],
+          ]);
+        });
 
     it('should be able to access component properties in the tracking function from a nested template',
        () => {
@@ -430,5 +429,79 @@ describe('control flow', () => {
            ['three', 'hello'],
          ]);
        });
+
+    it('should delete views in the middle', () => {
+      @Component({
+        template: '{#for (item of items); track item; let idx = $index}{{item}}({{idx}})|{/for}',
+      })
+      class TestComponent {
+        items = [1, 2, 3];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+      // delete in the middle
+      fixture.componentInstance.items.splice(1, 1);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|3(1)|');
+    });
+
+    it('should insert views in the middle', () => {
+      @Component({
+        template: '{#for (item of items); track item; let idx = $index}{{item}}({{idx}})|{/for}',
+      })
+      class TestComponent {
+        items = [1, 3];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|3(1)|');
+
+
+      // add in the middle
+      fixture.componentInstance.items.splice(1, 0, 2);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+    });
+
+    it('should replace different items', () => {
+      @Component({
+        template: '{#for (item of items); track item; let idx = $index}{{item}}({{idx}})|{/for}',
+      })
+      class TestComponent {
+        items = [1, 2, 3];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|');
+
+
+      // add in the middle
+      fixture.componentInstance.items = [5, 2, 7];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('5(0)|2(1)|7(2)|');
+    });
+
+    it('should move items (instead of creating) that are later in a list', () => {
+      @Component({
+        template: '{#for (item of items); track item; let idx = $index}{{item}}({{idx}})|{/for}',
+      })
+      class TestComponent {
+        items = [1, 2, 3, 4, 5, 6];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges(false);
+      expect(fixture.nativeElement.textContent).toBe('1(0)|2(1)|3(2)|4(3)|5(4)|6(5)|');
+
+      //
+      fixture.componentInstance.items = [5, 3, 7];
+      fixture.detectChanges(false);
+      expect(fixture.nativeElement.textContent).toBe('5(0)|3(1)|7(2)|');
+    });
   });
 });

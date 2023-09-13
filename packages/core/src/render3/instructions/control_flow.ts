@@ -93,7 +93,9 @@ export function ɵɵrepeaterTrackByIdentity<T>(_: number, value: T) {
 }
 
 class RepeaterMetadata {
-  constructor(public hasEmptyBlock: boolean, public differ: DefaultIterableDiffer<unknown>) {}
+  constructor(
+      public hasEmptyBlock: boolean, public differ: DefaultIterableDiffer<unknown>,
+      public trackByFn: any) {}
 }
 
 /**
@@ -129,7 +131,9 @@ export function ɵɵrepeaterCreate(
       // new function. For pure functions it's not necessary.
       trackByFn.bind(hostLView[DECLARATION_COMPONENT_VIEW][CONTEXT]) :
       trackByFn;
-  const metadata = new RepeaterMetadata(hasEmptyBlock, new DefaultIterableDiffer(boundTrackBy));
+  // TODO: init DefaultIterableDiffer lazily
+  const metadata =
+      new RepeaterMetadata(hasEmptyBlock, new DefaultIterableDiffer(boundTrackBy), boundTrackBy);
   hostLView[HEADER_OFFSET + index] = metadata;
 
   ɵɵtemplate(index + 1, templateFn, decls, vars);
@@ -144,13 +148,11 @@ export function ɵɵrepeaterCreate(
   }
 }
 
-// TODO: in reality we just need something like "array like"
-// TODO: this will be recursive, right? Just pass start / end indexes?
 function reconcile(
     itemTemplateTNode: TNode, hostLView: LView, lContainer: LContainer,
-    collection: ReadonlyArray<unknown>, trackByFn: any, oldStartIdx: number, oldEndIdx: number,
-    newStartIdx: number, newEndIdx: number) {
-  // pointers to the indices in the respective collections
+    collection: Readonly<ArrayLike<unknown>>, trackByFn: any, oldStartIdx: number,
+    oldEndIdx: number, newStartIdx: number, newEndIdx: number) {
+  let detachedViews: Map<unknown, LView>|undefined = undefined;
 
   // THINK: seems like the trackBy function would be invoked on the same item multiple times
   while (oldStartIdx < oldEndIdx && newStartIdx < newEndIdx) {
@@ -163,12 +165,14 @@ function reconcile(
     if (Object.is(oldKeyStart, newKeyStart)) {
       oldStartIdx++;
       newStartIdx++;
+      // TODO: similar logic for other places where I skip through a view => add tests (!!!)
+      oldViewStart[CONTEXT].$implicit = newItemStart;
       continue;
     }
 
     // compare from the end
     // THINK: off-by-1 errors and CONTAINER_HEADER_OFFSET are really easy to get wrong -
-    // alternatives?
+    // alternatives? Maybe a wrapper
     const oldViewEnd = getExistingLViewFromLContainer<RepeaterContext<unknown>>(
         lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
     const newItemEnd = collection[newEndIdx - 1];
@@ -180,42 +184,82 @@ function reconcile(
       continue;
     }
 
-    // swap?
-    // THINK: do I need to compare both ways?
-    if (newKeyStart === oldKeyEnd) {
+    // swap on both ends
+    // THINK: do I need to compare both ways? Write a test that exposes a pb
+    if (Object.is(newKeyStart, oldKeyEnd) && Object.is(newKeyEnd, oldKeyStart)) {
       swapViews(lContainer, newStartIdx, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
-      // THINK: other indices to adjust?
       newStartIdx++;
       newEndIdx--;
       oldStartIdx++;
       oldEndIdx--;
       continue;
     }
+
+    // fallback to the slow path: detach the old node hoping that we will find a matching sequence
+    // later observation: at this point we know that matching from the end is not helping us (?) =>
+    // probably not true since we can bump into a swap?
+    if (detachedViews === undefined) {
+      detachedViews = new Map();
+    }
+    const lView = detachExistingView<RepeaterContext<unknown>>(
+        lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
+    // TODO: I should not re-calculate key here but rather store it in the repeater context
+    detachedViews.set(
+        trackByFn(oldStartIdx - CONTAINER_HEADER_OFFSET, lView[CONTEXT].$implicit), lView);
+
+    oldEndIdx--;
+
+    // check if I'm inserting a previously detached view
+    if (detachedViews.has(newKeyStart)) {
+      addLViewToLContainer(
+          lContainer, detachedViews.get(newKeyStart)!, oldStartIdx - CONTAINER_HEADER_OFFSET);
+      detachedViews.delete(newKeyStart);
+      oldStartIdx++
+      oldEndIdx++;
+      newStartIdx++;
+    }
   }
 
   // more items in the collection => insert
   while (newStartIdx < newEndIdx) {
-    const newViewIdx = adjustToLastLContainerIndex(lContainer, null);
-    // THINK: this is the part that needs abstracting
-    const embeddedLView = createAndRenderEmbeddedLView(
-        hostLView, itemTemplateTNode,
-        new RepeaterContext(lContainer, collection[newStartIdx], newViewIdx));
-    addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
+    const newViewIdx = adjustToLastLContainerIndex(lContainer, newStartIdx);
+    const newItemKey = trackByFn(newViewIdx, collection[newStartIdx]);
+    if (detachedViews !== undefined && detachedViews.has(newItemKey)) {
+      addLViewToLContainer(lContainer, detachedViews.get(newItemKey)!, newViewIdx);
+      detachedViews.delete(newItemKey);
+    } else {
+      // THINK: this is the part that needs abstracting
+      const embeddedLView = createAndRenderEmbeddedLView(
+          hostLView, itemTemplateTNode,
+          new RepeaterContext(lContainer, collection[newStartIdx], newViewIdx));
+      addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
+    }
+
     newStartIdx++;
   }
 
-  // more items in a container => delete
+  // more items in a container => delete starting from the end
   while (oldStartIdx < oldEndIdx) {
-    const lView = detachExistingView(lContainer, lContainer.length - CONTAINER_HEADER_OFFSET - 1);
+    const lView = detachExistingView(lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
     destroyLView(lView[TVIEW], lView);
-    oldStartIdx++;
+    oldEndIdx--;
   }
+
+  // drop any views that were perviously detached but were not part of the new collection
+  if (detachedViews !== undefined) {
+    for (const lView of detachedViews.values()) {
+      destroyLView(lView[TVIEW], lView);
+    }
+  }
+
 
   // TESTS to write:
   // - duplicated keys => what should happen here? Careful - throwing in the dev mode is not
   // sufficient as production data might change the equation
   // - not an array => what should happen here? fallback to a different algo? Or just throw?
 }
+
+const EMPTY_ARRAY: Array<unknown> = [];
 
 /**
  * The repeater instruction does update-time diffing of a provided collection (against the
@@ -236,7 +280,7 @@ export function ɵɵrepeater(
   const containerIndex = metadataSlotIdx + 1;
   const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
 
-  // THINK: abstract this part!
+  // THINK: abstract this part so the diffing / reconciler returns this info ?
   let hasItemsInCollection = false;
 
   if (Array.isArray(collection) || collection == null) {
@@ -244,9 +288,8 @@ export function ɵɵrepeater(
     const collectionLen = collection != null ? collection.length : 0;
     hasItemsInCollection = collectionLen > 0;
     reconcile(
-        itemTemplateTNode, hostLView, lContainer, collection ?? [],
-        (_: number, item: unknown) => item, CONTAINER_HEADER_OFFSET, lContainer.length, 0,
-        collectionLen);
+        itemTemplateTNode, hostLView, lContainer, collection ?? EMPTY_ARRAY, metadata.trackByFn,
+        CONTAINER_HEADER_OFFSET, lContainer.length, 0, collectionLen);
   }
 
   // PERF: blasting through the whole collection isn't great - can I adjust those in-place?
@@ -354,11 +397,10 @@ function getExistingLViewFromLContainer<T>(lContainer: LContainer, index: number
 }
 
 function swapViews(lContainer: LContainer, startIdx: number, endIdx: number) {
-  debugger;
   const endView = detachExistingView(lContainer, endIdx);
   const startView = detachExistingView(lContainer, startIdx);
 
-  // TODO: adjust index?
+  // TODO: adjust index in swapped views?
   addLViewToLContainer(lContainer, endView, startIdx);
   addLViewToLContainer(lContainer, startView, endIdx);
 }
