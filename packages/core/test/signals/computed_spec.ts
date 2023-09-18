@@ -8,6 +8,8 @@
 
 import {computed, signal, watch} from '@angular/core/src/signals';
 
+import {flushEffects, testingEffect} from './effect_util';
+
 describe('computed', () => {
   it('should create computed', () => {
     const counter = signal(0);
@@ -173,5 +175,40 @@ describe('computed', () => {
     });
 
     expect(illegal).toThrow();
+  });
+
+  it('should maintain the reactivity graph - issue 51812', () => {
+    const updatingItems = signal<number[]>([]);
+    const deletingItems = signal<number[]>([]);
+    const refreshingItems = signal<number[]>([]);
+
+    const isCreating = signal<boolean>(false);
+    const isReading = signal<boolean>(false);
+
+    const isUpdating = computed(() => updatingItems().length > 0);
+    const isDeleting = computed(() => deletingItems().length > 0);
+    const isRefreshing = computed(() => refreshingItems().length > 0);
+
+    const isMutating = computed(() => isCreating() || isUpdating() || isDeleting());
+
+    const isProcessing = computed(() => {
+      console.log('Running computed');
+      return isMutating() || isReading() || refreshingItems().length > 0;
+    });
+
+    // create a testing effect to mark the isProcessing node as live
+    testingEffect(() => isProcessing());
+    flushEffects();
+
+    expect(isProcessing()).toBe(false);
+
+    deletingItems.set([1, 2, 3]);
+    expect(isProcessing()).toBe(true);
+
+    deletingItems.set([]);
+    expect(isProcessing()).toBe(false);
+
+    isReading.set(true);
+    expect(isProcessing()).toBe(true);
   });
 });
