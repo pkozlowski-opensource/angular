@@ -14,13 +14,15 @@ export interface RowData {
   label: string;
 }
 
-
 @Component({
   selector: 'js-web-frameworks',
   template: `
+    <!-- work-around for repeater instruction inlining -->
+    <ng-template [ngIf]="false">{#for sth of []; track sth}{/for}</ng-template>
     <table class="table table-hover table-striped test-data">
         <tbody>
-            <tr [class.danger]="item.id === selected" *ngFor="let item of data; trackBy: itemById">
+          {#for (item of data); track item.id}
+            <tr [class.danger]="item.id === selected">
                 <td class="col-md-1">{{item.id}}</td>
                 <td class="col-md-4">
                     <a href="#" (click)="select(item.id); $event.preventDefault()">{{item.label}}</a>
@@ -32,6 +34,7 @@ export interface RowData {
                 </td>
                 <td class="col-md-6"></td>
             </tr>
+          {/for}  
         </tbody>
     </table>
   `
@@ -41,10 +44,6 @@ export class JsWebFrameworksComponent {
   selected: number|null;
 
   constructor(private _appRef: ApplicationRef) {}
-
-  itemById(index: number, item: RowData) {
-    return item.id;
-  }
 
   select(itemId: number) {
     this.selected = itemId;
