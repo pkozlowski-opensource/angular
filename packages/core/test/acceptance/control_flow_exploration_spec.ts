@@ -364,34 +364,25 @@ describe('control flow', () => {
       expect(offsetReads).toBeGreaterThan(prevReads);
     });
 
-    fit('should be able to access component properties in the tracking function from a loop at the root of the template',
-        () => {
-          const calls: string[][] = [];
+    it('should be able to access component properties in the tracking function from a loop at the root of the template',
+       () => {
+         const calls: string[][] = [];
 
-          @Component({
-            template: `{#for (item of items); track trackingFn(item, compProp)}{{item}}{/for}`,
-          })
-          class TestComponent {
-            items = ['one', 'two', 'three'];
-            compProp = 'hello';
+         @Component({
+           template: `{#for (item of items); track trackingFn($index, items)}({{item}}){/for}`,
+         })
+         class TestComponent {
+           items = ['one', 'two', 'three'];
 
-            trackingFn(item: string, message: string) {
-              calls.push([item, message]);
-              return item;
-            }
-          }
+           trackingFn(index: number, items: string[]) {
+             return items[index]
+           }
+         }
 
-          const fixture = TestBed.createComponent(TestComponent);
-          fixture.detectChanges();
-          expect(calls).toEqual([
-            ['one', 'hello'],
-            ['two', 'hello'],
-            ['three', 'hello'],
-            ['one', 'hello'],
-            ['two', 'hello'],
-            ['three', 'hello'],
-          ]);
-        });
+         const fixture = TestBed.createComponent(TestComponent);
+         fixture.detectChanges();
+         expect(fixture.nativeElement.textContent).toBe('(one)(two)(three)');
+       });
 
     it('should be able to access component properties in the tracking function from a nested template',
        () => {
@@ -402,7 +393,7 @@ describe('control flow', () => {
             {#if true}
               {#if true}
                 {#if true}
-                  {#for (item of items); track trackingFn(item, compProp)}{{item}}{/for}
+                  {#for (item of items); track trackingFn($index, items)}({{item}}){/for}
                 {/if}
               {/if}
             {/if}
@@ -410,24 +401,15 @@ describe('control flow', () => {
          })
          class TestComponent {
            items = ['one', 'two', 'three'];
-           compProp = 'hello';
 
-           trackingFn(item: string, message: string) {
-             calls.push([item, message]);
-             return item;
+           trackingFn(index: number, items: string[]) {
+             return items[index]
            }
          }
 
          const fixture = TestBed.createComponent(TestComponent);
          fixture.detectChanges();
-         expect(calls).toEqual([
-           ['one', 'hello'],
-           ['two', 'hello'],
-           ['three', 'hello'],
-           ['one', 'hello'],
-           ['two', 'hello'],
-           ['three', 'hello'],
-         ]);
+         expect(fixture.nativeElement.textContent).toBe('(one)(two)(three)');
        });
 
     it('should delete views in the middle', () => {
