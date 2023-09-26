@@ -14,6 +14,7 @@ import {CONTAINER_HEADER_OFFSET, LContainer} from '../interfaces/container';
 import {ComponentTemplate} from '../interfaces/definition';
 import {TNode} from '../interfaces/node';
 import {CONTEXT, DECLARATION_COMPONENT_VIEW, HEADER_OFFSET, LView, TVIEW, TView} from '../interfaces/view';
+import {PrevCollection, reconcile} from '../list_diffing';
 import {destroyLView, detachView} from '../node_manipulation';
 import {getLView, nextBindingIndex} from '../state';
 import {getTNode} from '../util/view_utils';
@@ -148,115 +149,46 @@ export function ɵɵrepeaterCreate(
   }
 }
 
-function reconcile(
-    itemTemplateTNode: TNode, hostLView: LView, lContainer: LContainer,
-    collection: Readonly<ArrayLike<unknown>>, trackByFn: any, oldStartIdx: number,
-    oldEndIdx: number, newStartIdx: number, newEndIdx: number) {
-  let detachedViews: Map<unknown, LView>|undefined = undefined;
+// TODO: move it to the repeater file
+class PrevCollectionLContainerImpl implements PrevCollection<LView<RepeaterContext<unknown>>> {
+  // TODO: trackByFn typings
+  constructor(
+      private lContainer: LContainer, private hostLView: LView, private templateTNode: TNode,
+      private trackByFn: any) {}
 
-  // THINK: seems like the trackBy function would be invoked on the same item multiple times
-  while (oldStartIdx < oldEndIdx && newStartIdx < newEndIdx) {
-    // compare from the beginning
-    const oldViewStart = getExistingLViewFromLContainer<RepeaterContext<unknown>>(
-        lContainer, oldStartIdx - CONTAINER_HEADER_OFFSET);
-    const newItemStart = collection[newStartIdx];
-    const oldKeyStart = trackByFn(oldViewStart[CONTEXT].$index, oldViewStart[CONTEXT].$implicit);
-    const newKeyStart = trackByFn(newStartIdx, newItemStart);
-    if (Object.is(oldKeyStart, newKeyStart)) {
-      oldStartIdx++;
-      newStartIdx++;
-      // TODO: similar logic for other places where I skip through a view => add tests (!!!)
-      oldViewStart[CONTEXT].$implicit = newItemStart;
-      continue;
-    }
-
-    // compare from the end
-    // THINK: off-by-1 errors and CONTAINER_HEADER_OFFSET are really easy to get wrong -
-    // alternatives? Maybe a wrapper
-    const oldViewEnd = getExistingLViewFromLContainer<RepeaterContext<unknown>>(
-        lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
-    const newItemEnd = collection[newEndIdx - 1];
-    const oldKeyEnd = trackByFn(oldViewEnd[CONTEXT].$index, oldViewEnd[CONTEXT].$implicit);
-    const newKeyEnd = trackByFn(newEndIdx, newItemEnd);
-    if (Object.is(oldKeyEnd, newKeyEnd)) {
-      newEndIdx--;
-      oldEndIdx--;
-      continue;
-    }
-
-    // swap on both ends
-    // THINK: do I need to compare both ways? Write a test that exposes a pb
-    if (Object.is(newKeyStart, oldKeyEnd) && Object.is(newKeyEnd, oldKeyStart)) {
-      swapViews(lContainer, newStartIdx, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
-      newStartIdx++;
-      newEndIdx--;
-      oldStartIdx++;
-      oldEndIdx--;
-      continue;
-    }
-
-    // fallback to the slow path: detach the old node hoping that we will find a matching sequence
-    // later observation: at this point we know that matching from the end is not helping us (?) =>
-    // probably not true since we can bump into a swap?
-    if (detachedViews === undefined) {
-      detachedViews = new Map();
-    }
-    const lView = detachExistingView<RepeaterContext<unknown>>(
-        lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
-    // TODO: I should not re-calculate key here but rather store it in the repeater context
-    detachedViews.set(
-        trackByFn(oldStartIdx - CONTAINER_HEADER_OFFSET, lView[CONTEXT].$implicit), lView);
-
-    oldEndIdx--;
-
-    // check if I'm inserting a previously detached view
-    if (detachedViews.has(newKeyStart)) {
-      addLViewToLContainer(
-          lContainer, detachedViews.get(newKeyStart)!, oldStartIdx - CONTAINER_HEADER_OFFSET);
-      detachedViews.delete(newKeyStart);
-      oldStartIdx++
-      oldEndIdx++;
-      newStartIdx++;
-    }
+  get length(): number {
+    return this.lContainer.length - CONTAINER_HEADER_OFFSET;
   }
 
-  // more items in the collection => insert
-  while (newStartIdx < newEndIdx) {
-    const newViewIdx = adjustToLastLContainerIndex(lContainer, newStartIdx);
-    const newItemKey = trackByFn(newViewIdx, collection[newStartIdx]);
-    if (detachedViews !== undefined && detachedViews.has(newItemKey)) {
-      addLViewToLContainer(lContainer, detachedViews.get(newItemKey)!, newViewIdx);
-      detachedViews.delete(newItemKey);
-    } else {
-      // THINK: this is the part that needs abstracting
-      const embeddedLView = createAndRenderEmbeddedLView(
-          hostLView, itemTemplateTNode,
-          new RepeaterContext(lContainer, collection[newStartIdx], newViewIdx));
-      addLViewToLContainer(lContainer, embeddedLView, newViewIdx);
-    }
-
-    newStartIdx++;
+  at(index: number) {
+    return getExistingLViewFromLContainer<RepeaterContext<unknown>>(this.lContainer, index);
   }
 
-  // more items in a container => delete starting from the end
-  while (oldStartIdx < oldEndIdx) {
-    const lView = detachExistingView(lContainer, oldEndIdx - CONTAINER_HEADER_OFFSET - 1);
+  key(index: number): unknown {
+    const lView = this.at(index);
+    return this.trackByFn(index, lView[CONTEXT].$implicit);
+  }
+
+  attach(index: number, lView: LView<unknown>): void {
+    addLViewToLContainer(this.lContainer, lView, index, true);
+  }
+
+  detach(index: number) {
+    return detachExistingView<RepeaterContext<unknown>>(this.lContainer, index);
+  }
+
+  create(index: number, value: unknown) {
+    const lView = createAndRenderEmbeddedLView(
+        this.hostLView, this.templateTNode, new RepeaterContext(this.lContainer, value, index));
+    this.attach(index, lView);
+
+    return lView;
+  }
+
+  destroy(lView: LView): void {
+    // TODO: refactor to not access TVIEW?
     destroyLView(lView[TVIEW], lView);
-    oldEndIdx--;
   }
-
-  // drop any views that were perviously detached but were not part of the new collection
-  if (detachedViews !== undefined) {
-    for (const lView of detachedViews.values()) {
-      destroyLView(lView[TVIEW], lView);
-    }
-  }
-
-
-  // TESTS to write:
-  // - duplicated keys => what should happen here? Careful - throwing in the dev mode is not
-  // sufficient as production data might change the equation
-  // - not an array => what should happen here? fallback to a different algo? Or just throw?
 }
 
 const EMPTY_ARRAY: Array<unknown> = [];
@@ -275,7 +207,7 @@ export function ɵɵrepeater(
     metadataSlotIdx: number, collection: Iterable<unknown>|undefined|null): void {
   const hostLView = getLView();
   const hostTView = hostLView[TVIEW];
-  // TODO: metadata depends on the differ
+  // TODO: metadata depends on the differ / algorithm selection
   const metadata = hostLView[HEADER_OFFSET + metadataSlotIdx] as RepeaterMetadata;
   const containerIndex = metadataSlotIdx + 1;
   const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
@@ -283,19 +215,26 @@ export function ɵɵrepeater(
   // THINK: abstract this part so the diffing / reconciler returns this info ?
   let hasItemsInCollection = false;
 
+  // TODO: algorithm selection (should not do it on null !)
+  // TODO: algorithm selection (type of a collection might change)
   if (Array.isArray(collection) || collection == null) {
     const itemTemplateTNode = getExistingTNode(hostTView, containerIndex);
     const collectionLen = collection != null ? collection.length : 0;
     hasItemsInCollection = collectionLen > 0;
+    // THINK: do I need to access trackByFn twice?
+    // PERF: avoid re-creating PrevCollectionLContainerImpl
     reconcile(
-        itemTemplateTNode, hostLView, lContainer, collection ?? EMPTY_ARRAY, metadata.trackByFn,
-        CONTAINER_HEADER_OFFSET, lContainer.length, 0, collectionLen);
-  }
+        new PrevCollectionLContainerImpl(
+            lContainer, hostLView, itemTemplateTNode, metadata.trackByFn),
+        collection ?? EMPTY_ARRAY, metadata.trackByFn);
 
-  // PERF: blasting through the whole collection isn't great - can I adjust those in-place?
-  for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
-    const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
-    lView[CONTEXT].$index = i;
+    // PERF: blasting through the whole collection isn't great - can I adjust those in-place?
+    for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
+      const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
+      lView[CONTEXT].$index = i;
+      // TODO: this doesn't seem right...
+      lView[CONTEXT].$implicit = collection![i];
+    }
   }
 
 
@@ -394,15 +333,6 @@ function getExistingLViewFromLContainer<T>(lContainer: LContainer, index: number
   ngDevMode && assertLView(existingLView);
 
   return existingLView!;
-}
-
-function swapViews(lContainer: LContainer, startIdx: number, endIdx: number) {
-  const endView = detachExistingView(lContainer, endIdx);
-  const startView = detachExistingView(lContainer, startIdx);
-
-  // TODO: adjust index in swapped views?
-  addLViewToLContainer(lContainer, endView, startIdx);
-  addLViewToLContainer(lContainer, startView, endIdx);
 }
 
 function getExistingTNode(tView: TView, index: number): TNode {
