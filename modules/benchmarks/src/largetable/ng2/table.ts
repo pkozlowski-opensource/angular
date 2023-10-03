@@ -17,15 +17,15 @@ let trustedGreyColor: SafeStyle;
 @Component({
   selector: 'largetable',
   template: `<table><tbody>
-    {#for (row of data); track $index}
+    @for ((row of data); track $index) {
     <tr>
-    {#for (cell of row); track $index}
-      <td [style.backgroundColor]="getColor(cell.row)">
-      {{cell.value}}
-      </td>
-      {/for}
+      @for ((cell of row); track $index) {
+        <td [style.backgroundColor]="getColor(cell.row)">
+          {{cell.value}}
+        </td>
+      }
     </tr>
-    {/for}
+    }
   </tbody></table>`,
 })
 export class TableComponent {

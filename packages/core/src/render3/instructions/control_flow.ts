@@ -70,7 +70,7 @@ export function ɵɵconditional<T>(containerIndex: number, matchingTemplateIndex
 }
 
 export class RepeaterContext<T> {
-  constructor(private lContainer: LContainer, public $implicit: T, public $index: number) {}
+  constructor(private lContainer: LContainer, public $index: number, public $implicit: T) {}
 
   get $count(): number {
     return this.lContainer.length - CONTAINER_HEADER_OFFSET;
@@ -181,7 +181,7 @@ class LiveCollectionLContainerImpl extends
     const dehydratedView =
         findMatchingDehydratedView(this.lContainer, this.templateTNode.tView!.ssrId);
     const embeddedLView = createAndRenderEmbeddedLView(
-        this.hostLView, this.templateTNode, new RepeaterContext(this.lContainer, value, index),
+        this.hostLView, this.templateTNode, new RepeaterContext(this.lContainer, index, value),
         {dehydratedView});
 
     return embeddedLView;
@@ -190,9 +190,17 @@ class LiveCollectionLContainerImpl extends
     destroyLView(lView[TVIEW], lView);
   }
   override updateValue(index: number, value: unknown): void {
-    this.at(index)[CONTEXT].$implicit = value;
+    const ctx = this.at(index)[CONTEXT];
+    if (!Object.is(value, ctx.$implicit)) {
+      ctx.$implicit = value;
+    }
   }
 }
+
+// PERF: avoid inlining of LiveCollectionLContainerImpl
+(() => {
+  new LiveCollectionLContainerImpl(null as any, null as any, null as any, null as any);
+})();
 
 /**
  * The repeater instruction does update-time diffing of a provided collection (against the

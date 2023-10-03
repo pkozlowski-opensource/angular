@@ -18,10 +18,10 @@ export interface RowData {
   selector: 'js-web-frameworks',
   template: `
     <!-- work-around for repeater instruction inlining -->
-    <ng-template [ngIf]="false">{#for sth of []; track sth}{/for}</ng-template>
+    @for ((item of []); track $index) { {{''}} }
     <table class="table table-hover table-striped test-data">
         <tbody>
-          {#for (item of data); track item.id}
+          @for ((item of data); track item.id) {
             <tr [class.danger]="item.id === selected">
                 <td class="col-md-1">{{item.id}}</td>
                 <td class="col-md-4">
@@ -34,7 +34,7 @@ export interface RowData {
                 </td>
                 <td class="col-md-6"></td>
             </tr>
-          {/for}  
+          }  
         </tbody>
     </table>
   `
