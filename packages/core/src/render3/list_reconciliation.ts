@@ -72,12 +72,15 @@ export abstract class LiveCollection<T, V> {
  */
 export function reconcile<T, V>(
     liveCollection: LiveCollection<T, V>, newCollection: Iterable<V>|undefined|null,
-    trackByFn: TrackByFunction<V>): void {
+    trackByFn: TrackByFunction<V>): boolean {
   let detachedItems: MultiMap<unknown, T>|undefined = undefined;
   let liveKeysInTheFuture: Set<unknown>|undefined = undefined;
 
   let liveStartIdx = 0;
   let liveEndIdx = liveCollection.length - 1;
+
+  // indicates if indexes in the live collection need update after the reconciliation step
+  let needsIndexUpdate = false;
 
   if (Array.isArray(newCollection)) {
     let newEndIdx = newCollection.length - 1;
@@ -104,6 +107,8 @@ export function reconcile<T, V>(
         newEndIdx--;
         continue;
       }
+
+      needsIndexUpdate = true;
 
       // Detect swap / moves:
       if (Object.is(newStartKey, liveEndKey) && Object.is(newEndKey, liveStartKey)) {
@@ -174,6 +179,8 @@ export function reconcile<T, V>(
         detachedItems ??= new MultiMap();
         liveKeysInTheFuture ??= initLiveItemsInTheFuture(liveCollection, liveStartIdx, liveEndIdx);
 
+        needsIndexUpdate = true;
+
         // Check if I'm inserting a previously detached item: if so, attach it here
         if (attachPreviouslyDetached(liveCollection, detachedItems, liveStartIdx, newKey)) {
           liveCollection.updateValue(liveStartIdx, newValue);
@@ -211,6 +218,8 @@ export function reconcile<T, V>(
 
   // - destroy items that were detached but never attached again.
   detachedItems?.forEach(item => liveCollection.destroy(item));
+
+  return needsIndexUpdate;
 }
 
 function attachPreviouslyDetached<T, V>(

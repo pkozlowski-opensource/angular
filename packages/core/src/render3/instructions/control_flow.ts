@@ -213,17 +213,17 @@ export function ɵɵrepeater(
   const lContainer = getLContainer(hostLView, HEADER_OFFSET + containerIndex);
   const itemTemplateTNode = getExistingTNode(hostTView, containerIndex);
 
-  reconcile(
+  const needsIndexUpdate = reconcile(
       new LiveCollectionLContainerImpl(
           lContainer, hostLView, itemTemplateTNode, metadata.trackByFn),
       collection, metadata.trackByFn);
 
   // moves in the container might caused context's index to get out of order, re-adjust
-  // PERF: we could try to book-keep moves and do this index re-adjust as need, at the cost of the
-  // additional code complexity
-  for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
-    const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
-    lView[CONTEXT].$index = i;
+  if (needsIndexUpdate) {
+    for (let i = 0; i < lContainer.length - CONTAINER_HEADER_OFFSET; i++) {
+      const lView = getExistingLViewFromLContainer<RepeaterContext<unknown>>(lContainer, i);
+      lView[CONTEXT].$index = i;
+    }
   }
 
   // handle empty blocks
