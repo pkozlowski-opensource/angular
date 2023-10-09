@@ -7,8 +7,10 @@
  */
 
 
+import {AsyncPipe} from '@angular/common';
 import {Component, Pipe, PipeTransform} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
+import {BehaviorSubject} from 'rxjs';
 
 // Basic shared pipe used during testing.
 @Pipe({name: 'multiply', pure: true, standalone: true})
@@ -234,5 +236,25 @@ describe('control flow - if', () => {
     fixture.componentInstance.value = 1;
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent.trim()).toBe('one');
+  });
+
+  // https://github.com/angular/angular/issues/52102
+  it('should allow injecting ChangeDetectorRef in pipes used with a condition', () => {
+    @Component({
+      standalone: true,
+      imports: [AsyncPipe],
+      template: `
+          @if (condition$ | async) {
+            showing
+          }
+        `,
+    })
+    class TestComponent {
+      condition$ = new BehaviorSubject(true);
+    }
+
+    const fixture = TestBed.createComponent(TestComponent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent.trim()).toBe('showing');
   });
 });
