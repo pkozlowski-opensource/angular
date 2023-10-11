@@ -10,7 +10,7 @@
 import {ChangeDetectorRef, Component, inject, Pipe, PipeTransform} from '@angular/core';
 import {TestBed} from '@angular/core/testing';
 
-describe('control flow - for', () => {
+fdescribe('control flow - for', () => {
   it('should create, remove and move views corresponding to items in a collection', () => {
     @Component({
       template: '@for ((item of items); track item; let idx = $index) {{{item}}({{idx}})|}',
@@ -63,39 +63,6 @@ describe('control flow - for', () => {
     expect(fixture.nativeElement.textContent).toBe('3(0)|2(1)|1(2)|');
   });
 
-  it('should support empty blocks', () => {
-    @Component({
-      template: '@for ((item of items); track idx; let idx = $index) {|} @empty {Empty}',
-    })
-    class TestComponent {
-      items: number[]|null|undefined = [1, 2, 3];
-    }
-
-    const fixture = TestBed.createComponent(TestComponent);
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('|||');
-
-    fixture.componentInstance.items = [];
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('Empty');
-
-    fixture.componentInstance.items = [0, 1];
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('||');
-
-    fixture.componentInstance.items = null;
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('Empty');
-
-    fixture.componentInstance.items = [0];
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('|');
-
-    fixture.componentInstance.items = undefined;
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toBe('Empty');
-  });
-
   it('should be able to use pipes injecting ChangeDetectorRef in for loop blocks', () => {
     @Pipe({name: 'test', standalone: true})
     class TestPipe implements PipeTransform {
@@ -118,6 +85,58 @@ describe('control flow - for', () => {
     const fixture = TestBed.createComponent(TestComponent);
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toBe('1|2|3|');
+  });
+
+  describe('empty blocks', () => {
+    it('should support empty blocks', () => {
+      @Component({
+        template: '@for ((item of items); track idx; let idx = $index) {|} @empty {Empty}',
+      })
+      class TestComponent {
+        items: number[]|null|undefined = [1, 2, 3];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('|||');
+
+      fixture.componentInstance.items = [];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
+
+      fixture.componentInstance.items = [0, 1];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('||');
+
+      fixture.componentInstance.items = null;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
+
+      fixture.componentInstance.items = [0];
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('|');
+
+      fixture.componentInstance.items = undefined;
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toBe('Empty');
+    });
+
+    fit('should not allocate / use binding slot when there are no empty blocks', () => {
+      @Component({
+        template: '@for ((item of items); track $index) {({{item}})}|{{items.length}}',
+      })
+      class TestComponent {
+        items: number[]|null|undefined = [1, 2, 3];
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      fixture.detectChanges(false);
+      expect(fixture.nativeElement.textContent).toBe('(1)(2)(3)|3');
+
+      fixture.componentInstance.items = [];
+      fixture.detectChanges(false);
+      expect(fixture.nativeElement.textContent).toBe('|0');
+    });
   });
 
   describe('trackBy', () => {

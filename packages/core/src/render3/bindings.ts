@@ -18,6 +18,7 @@ import {NO_CHANGE} from './tokens';
 // TODO(misko): consider inlining
 /** Updates binding and returns the value. */
 export function updateBinding(lView: LView, bindingIndex: number, value: any): any {
+  debugger;
   return lView[bindingIndex] = value;
 }
 
