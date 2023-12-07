@@ -6,7 +6,6 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {InjectionToken} from '../di/injection_token';
 import {ProviderToken} from '../di/provider_token';
 import {makePropDecorator} from '../util/decorators';
 
