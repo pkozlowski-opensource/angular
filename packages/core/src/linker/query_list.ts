@@ -44,8 +44,10 @@ function symbolIterator<T>(this: QueryList<T>): Iterator<T> {
  * @publicApi
  */
 export class QueryList<T> implements Iterable<T> {
-  public readonly dirty = true;
+  public readonly dirty: boolean = true;
   private _results: Array<T> = [];
+  // TODO: can be a separate commit
+  private _onDirty?: () => void;
   private _changesDetected: boolean = false;
   private _changes: EventEmitter<QueryList<T>>|undefined = undefined;
 
@@ -174,8 +176,18 @@ export class QueryList<T> implements Iterable<T> {
   }
 
   /** internal */
+  onDirty(cb: () => void) {
+    this._onDirty = cb;
+  }
+
+  /** internal */
   setDirty() {
-    (this as {dirty: boolean}).dirty = true;
+    if (this.dirty === false) {
+      (this as {dirty: boolean}).dirty = true;
+      if (this._onDirty) {
+        this._onDirty();
+      }
+    }
   }
 
   /** internal */

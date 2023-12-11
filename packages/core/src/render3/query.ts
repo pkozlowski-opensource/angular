@@ -9,7 +9,11 @@
 // We are temporarily importing the existing viewEngine_from core so we can be sure we are
 // correctly implementing its interfaces for backwards compatibility.
 
+import {REACTIVE_NODE, ReactiveNode, SIGNAL} from '@angular/core/primitives/signals';
+import {consumerMarkDirty, producerAccessed, producerUpdateValueVersion} from '@angular/core/primitives/signals/src/graph';
+
 import {ProviderToken} from '../di/provider_token';
+import {RuntimeError} from '../errors';
 import {createElementRef, ElementRef as ViewEngine_ElementRef, unwrapElementRef} from '../linker/element_ref';
 import {QueryList} from '../linker/query_list';
 import {createTemplateRef, TemplateRef as ViewEngine_TemplateRef} from '../linker/template_ref';
@@ -25,6 +29,7 @@ import {TContainerNode, TElementContainerNode, TElementNode, TNode, TNodeType} f
 import {LQueries, LQuery, QueryFlags, TQueries, TQuery, TQueryMetadata} from './interfaces/query';
 import {DECLARATION_LCONTAINER, LView, PARENT, QUERIES, TVIEW, TView} from './interfaces/view';
 import {assertTNodeType} from './node_assert';
+import {Signal} from './reactivity/api';
 import {getCurrentQueryIndex, getCurrentTNode, getLView, getTView, setCurrentQueryIndex} from './state';
 import {isCreationMode} from './util/view_utils';
 
@@ -416,14 +421,16 @@ function collectQueryResults<T>(tView: TView, lView: LView, queryIndex: number, 
  *
  * @codeGenApi
  */
+// TODO: we don't need to refresh signal-based queries but still need to call something that would
+// advance currentQueryIndex...
 export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
   const lView = getLView();
-  const tView = getTView();
   const queryIndex = getCurrentQueryIndex();
 
   setCurrentQueryIndex(queryIndex + 1);
-
+  const tView = lView[TVIEW];
   const tQuery = getTQuery(tView, queryIndex);
+
   if (queryList.dirty &&
       (isCreationMode(lView) ===
        ((tQuery.metadata.flags & QueryFlags.isStatic) === QueryFlags.isStatic))) {
@@ -438,7 +445,6 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
     }
     return true;
   }
-
   return false;
 }
 
@@ -453,6 +459,28 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
  */
 export function ɵɵviewQuery<T>(
     predicate: ProviderToken<unknown>|string[], flags: QueryFlags, read?: any): void {
+  createViewQuery<T>(predicate, flags, read);
+}
+
+// TODO: update documentation (seems to be out of date for other instructions as well...)
+/**
+ * Creates new QueryList, stores the reference in LView and returns QueryList.
+ *
+ * @param predicate The type for which the query will search
+ * @param flags Flags associated with the query
+ * @param read What to save in the query
+ *
+ * @codeGenApi
+ */
+// TODO: should have special signature for the query signal type?
+export function ɵɵViewQueryAsSignal<T>(
+    target: Signal<T>, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
+    read?: ProviderToken<unknown>): void {
+  bindQueryToSignal(target, createViewQuery(predicate, flags, read));
+}
+
+function createViewQuery<T>(
+    predicate: ProviderToken<unknown>|string[], flags: QueryFlags, read?: any): number {
   ngDevMode && assertNumber(flags, 'Expecting flags');
   const tView = getTView();
   if (tView.firstCreatePass) {
@@ -461,7 +489,84 @@ export function ɵɵviewQuery<T>(
       tView.staticViewQueries = true;
     }
   }
-  createLQuery<T>(tView, getLView(), flags);
+  return createLQuery<T>(tView, getLView(), flags);
+}
+
+// TODO: organize code - it all shouldn't be in one file...
+export interface QuerySignalNode<T> extends ReactiveNode {
+  _lView?: LView;
+  _queryIndex?: number;
+  _queryList?: QueryList<T>;
+}
+
+// Note: Using an IIFE here to ensure that the spread assignment is not considered
+// a side-effect, ending up preserving `COMPUTED_NODE` and `REACTIVE_NODE`.
+// TODO: remove when https://github.com/evanw/esbuild/issues/3392 is resolved.
+export const QUERY_SIGNAL_NODE: QuerySignalNode<unknown> = /* @__PURE__ */ (() => {
+  return {
+    ...REACTIVE_NODE,
+
+    // Base reactive node.overrides
+    producerMustRecompute: (node: QuerySignalNode<unknown>) => {
+      return !!node._queryList?.dirty;
+    },
+
+    producerRecomputeValue: (node: QuerySignalNode<unknown>) => {
+      // The current value is stale. Check whether we need to produce a new one.
+      // TODO: assert: I've got both the lView and queryIndex stored
+      // TODO(perf): I'm assuming that the signal value changes when the list of matches changes.
+      // But this is not correct for the single-element queries since we should also compare (===)
+      // the value of the first element.
+      if (refreshSignalQuery(node._lView!, node._queryIndex!)) {
+        node.version++;
+      }
+    }
+
+    // TODO: unsubscribe - destroy? I don't think there is anything to do here, but think about it
+    // more
+  };
+})();
+
+export function createQuerySignalFn<V>(firstOnly: boolean, required: boolean) {
+  const node: QuerySignalNode<V> = Object.create(QUERY_SIGNAL_NODE);
+  function signalFn() {
+    // Check if the value needs updating before returning it.
+    producerUpdateValueVersion(node);
+
+    // Mark this producer as accessed.
+    producerAccessed(node);
+
+    if (firstOnly) {
+      const firstValue = node._queryList?.first
+      // TODO: exact semantics of "required" - is it "just" disallowing undefined?
+      if (firstValue === undefined && required) {
+        // TODO: add error code
+        // TODO: add proper message
+        throw new RuntimeError(0, 'no query results yet!');
+      }
+      return firstValue;
+    } else {
+      // TODO(perf): make sure that I'm not creating new arrays when returning results (both the one
+      // with results as well as the empty array)
+      return node._queryList?.toArray() ?? [];
+    }
+  }
+  (signalFn as any)[SIGNAL] = node;
+
+  return signalFn;
+}
+
+function bindQueryToSignal<T>(target: Signal<T>, queryIndex: number): void {
+  const node = target[SIGNAL] as QuerySignalNode<unknown>;
+  node._lView = getLView();
+  node._queryIndex = queryIndex;
+  node._queryList = loadQueryInternal(node._lView, queryIndex);
+  node._queryList.onDirty(() => {
+    // Mark this producer as dirty and notify live consumer about the potential change. Note
+    // that the onDirty callback will fire only on the initial dirty marking (that is,
+    // subsequent dirty notifications are not fired- until the QueryList becomes clean again).
+    consumerMarkDirty(node);
+  });
 }
 
 /**
@@ -509,13 +614,17 @@ function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
   return lView[QUERIES]!.queries[queryIndex].queryList;
 }
 
-function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags) {
+// TODO: can do return of the query index in a separate, preparatory commit
+function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags): number {
   const queryList = new QueryList<T>(
       (flags & QueryFlags.emitDistinctChangesOnly) === QueryFlags.emitDistinctChangesOnly);
+
+  // TODO(perf): do we have any subscribers in the signal-based queries? Probably not! Maybe I can
+  // skip storing cleanup here?
   storeCleanupWithContext(tView, lView, queryList, queryList.destroy);
 
-  if (lView[QUERIES] === null) lView[QUERIES] = new LQueries_();
-  lView[QUERIES]!.queries.push(new LQuery_(queryList));
+  lView[QUERIES] ??= new LQueries_();
+  return lView[QUERIES].queries.push(new LQuery_(queryList)) - 1;
 }
 
 function createTQuery(tView: TView, metadata: TQueryMetadata, nodeIndex: number): void {
@@ -535,4 +644,31 @@ function saveContentQueryAndDirectiveIndex(tView: TView, directiveIndex: number)
 function getTQuery(tView: TView, index: number): TQuery {
   ngDevMode && assertDefined(tView.queries, 'TQueries must be defined to retrieve a TQuery');
   return tView.queries!.getByIndex(index);
+}
+
+// TODO: some code duplication with queryRefresh
+function refreshSignalQuery(lView: LView<unknown>, queryIndex: number): boolean {
+  const queryList = loadQueryInternal<unknown>(lView, queryIndex);
+
+  // TODO: we might not need the QueryList at all for signal-based queries (which would be
+  // nice win for the code size!)
+  if (queryList.dirty) {
+    const tView = lView[TVIEW];
+    const tQuery = getTQuery(tView, queryIndex);
+    if (tQuery.matches === null) {
+      // TODO(perf): have an empty array that I can use to reset query results
+      // TODO: actually, I don't think I need to refresh a query that has null matches
+      queryList.reset([]);
+    } else {
+      // TODO: code duplication with query refresh
+      const result = tQuery.crossesNgTemplate ?
+          collectQueryResults(tView, lView, queryIndex, []) :
+          materializeViewResults(tView, lView, tQuery, queryIndex);
+      // TODO: test to write - doesn't dirty reactive node if there were no actual changes in the
+      // query matches
+      queryList.reset(result, unwrapElementRef);
+    }
+    return true;
+  }
+  return false;
 }
