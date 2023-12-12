@@ -12,7 +12,7 @@ import {viewChild, viewChildren} from '@angular/core/src/authoring/queries';
 import {ɵɵViewQueryAsSignal} from '@angular/core/src/render3/query';
 import {TestBed} from '@angular/core/testing';
 
-fdescribe('queries as signals', () => {
+describe('queries as signals', () => {
   describe('view', () => {
     it('view child - HAND GENERATED CODE - delete after compiler is done', () => {
       const _c0 = ['el'];

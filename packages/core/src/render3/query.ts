@@ -527,6 +527,9 @@ export const QUERY_SIGNAL_NODE: QuerySignalNode<unknown> = /* @__PURE__ */ (() =
   };
 })();
 
+export function createQuerySignalFn<V>(firstOnly: true, required: true): Signal<V>;
+export function createQuerySignalFn<V>(firstOnly: true, required: false): Signal<V|undefined>;
+export function createQuerySignalFn<V>(firstOnly: false, required: false): Signal<ReadonlyArray<V>>;
 export function createQuerySignalFn<V>(firstOnly: boolean, required: boolean) {
   const node: QuerySignalNode<V> = Object.create(QUERY_SIGNAL_NODE);
   function signalFn() {
