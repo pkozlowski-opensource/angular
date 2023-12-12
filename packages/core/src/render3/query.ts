@@ -447,7 +447,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
 }
 
 /**
- * Creates new QueryList, stores the reference in LView and returns QueryList.
+ * Creates a new view query by initializing internal data structures.
  *
  * @param predicate The type for which the query will search
  * @param flags Flags associated with the query
@@ -460,10 +460,11 @@ export function ɵɵviewQuery<T>(
   createViewQuery<T>(predicate, flags, read);
 }
 
-// TODO: update documentation (seems to be out of date for other instructions as well...)
 /**
- * Creates new QueryList, stores the reference in LView and returns QueryList.
+ * Creates a new view query by initializing internal data structures and binding a new query to the
+ * target signal.
  *
+ * @param target The target signal to assign the query results to.
  * @param predicate The type for which the query will search
  * @param flags Flags associated with the query
  * @param read What to save in the query
@@ -582,6 +583,30 @@ function bindQueryToSignal<T>(target: Signal<T>, queryIndex: number): void {
 export function ɵɵcontentQuery<T>(
     directiveIndex: number, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
     read?: any): void {
+  createContentQuery<T>(directiveIndex, predicate, flags, read);
+}
+
+/**
+ * Registers a QueryList, associated with a content query, for later refresh (part of a view
+ * refresh).
+ *
+ * @param directiveIndex Current directive index
+ * @param predicate The type for which the query will search
+ * @param flags Flags associated with the query
+ * @param read What to save in the query
+ * @returns QueryList<T>
+ *
+ * @codeGenApi
+ */
+export function ɵɵcontentQueryAsSignal<T>(
+    target: Signal<T>, directiveIndex: number, predicate: ProviderToken<unknown>|string[],
+    flags: QueryFlags, read?: any): void {
+  bindQueryToSignal(target, createContentQuery(directiveIndex, predicate, flags, read));
+}
+
+function createContentQuery<T>(
+    directiveIndex: number, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
+    read?: ProviderToken<T>): number {
   ngDevMode && assertNumber(flags, 'Expecting flags');
   const tView = getTView();
   if (tView.firstCreatePass) {
@@ -593,7 +618,7 @@ export function ɵɵcontentQuery<T>(
     }
   }
 
-  createLQuery<T>(tView, getLView(), flags);
+  return createLQuery<T>(tView, getLView(), flags);
 }
 
 /**
@@ -612,7 +637,6 @@ function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
   return lView[QUERIES]!.queries[queryIndex].queryList;
 }
 
-// TODO: can do return of the query index in a separate, preparatory commit
 function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags): number {
   const queryList = new QueryList<T>(
       (flags & QueryFlags.emitDistinctChangesOnly) === QueryFlags.emitDistinctChangesOnly);
@@ -621,8 +645,8 @@ function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags): number 
   // skip storing cleanup here?
   storeCleanupWithContext(tView, lView, queryList, queryList.destroy);
 
-  lView[QUERIES] ??= new LQueries_();
-  return lView[QUERIES].queries.push(new LQuery_(queryList)) - 1;
+  const lQueries = (lView[QUERIES] ??= new LQueries_()).queries;
+  return lQueries.push(new LQuery_(queryList)) - 1;
 }
 
 function createTQuery(tView: TView, metadata: TQueryMetadata, nodeIndex: number): void {
