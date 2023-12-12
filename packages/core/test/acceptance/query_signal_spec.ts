@@ -9,7 +9,7 @@
 // TODO: update imports
 import {computed, ElementRef, ɵɵdefineComponent, ɵɵelement, ɵɵStandaloneFeature} from '@angular/core';
 import {viewChild, viewChildren} from '@angular/core/src/authoring/queries';
-import {ɵɵViewQueryAsSignal} from '@angular/core/src/render3/query';
+import {ɵɵviewQueryAsSignal} from '@angular/core/src/render3/query';
 import {TestBed} from '@angular/core/testing';
 
 describe('queries as signals', () => {
@@ -28,7 +28,7 @@ describe('queries as signals', () => {
               function App_Query(rf, ctx) {
                 // TODO: there should be no update mode for queries any more
                 if (rf & 1) {
-                  ɵɵViewQueryAsSignal(ctx.divEl, _c0, 1);
+                  ɵɵviewQueryAsSignal(ctx.divEl, _c0, 1);
                 }
               },
           standalone: true,
@@ -75,7 +75,7 @@ describe('queries as signals', () => {
               function App_Query(rf, ctx) {
                 // TODO: there should be no update mode for queries any more
                 if (rf & 1) {
-                  ɵɵViewQueryAsSignal(ctx.divEl, _c0, 1);
+                  ɵɵviewQueryAsSignal(ctx.divEl, _c0, 1);
                 }
               },
           standalone: true,
@@ -124,7 +124,7 @@ describe('queries as signals', () => {
               function App_Query(rf, ctx) {
                 // TODO: there should be no update mode for queries any more?
                 if (rf & 1) {
-                  ɵɵViewQueryAsSignal(ctx.divEls, _c0, 1);
+                  ɵɵviewQueryAsSignal(ctx.divEls, _c0, 1);
                 }
               },
           standalone: true,

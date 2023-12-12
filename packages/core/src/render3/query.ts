@@ -471,7 +471,7 @@ export function ɵɵviewQuery<T>(
  * @codeGenApi
  */
 // TODO: should have special signature for the query signal type?
-export function ɵɵViewQueryAsSignal<T>(
+export function ɵɵviewQueryAsSignal<T>(
     target: Signal<T>, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
     read?: ProviderToken<unknown>): void {
   bindQueryToSignal(target, createViewQuery(predicate, flags, read));
@@ -519,9 +519,6 @@ export const QUERY_SIGNAL_NODE: QuerySignalNode<unknown> = /* @__PURE__ */ (() =
         node.version++;
       }
     }
-
-    // TODO: unsubscribe - destroy? I don't think there is anything to do here, but think about it
-    // more
   };
 })();
 
