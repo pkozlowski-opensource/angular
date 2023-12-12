@@ -434,9 +434,7 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
   if (queryList.dirty &&
       (isCreationMode(lView) ===
        ((tQuery.metadata.flags & QueryFlags.isStatic) === QueryFlags.isStatic))) {
-    if (tQuery.matches === null) {
-      queryList.reset([]);
-    } else {
+    if (tQuery.matches !== null) {
       const result = tQuery.crossesNgTemplate ?
           collectQueryResults(tView, lView, queryIndex, []) :
           materializeViewResults(tView, lView, tQuery, queryIndex);
@@ -658,11 +656,7 @@ function refreshSignalQuery(lView: LView<unknown>, queryIndex: number): boolean 
   if (queryList.dirty) {
     const tView = lView[TVIEW];
     const tQuery = getTQuery(tView, queryIndex);
-    if (tQuery.matches === null) {
-      // TODO(perf): have an empty array that I can use to reset query results
-      // TODO: actually, I don't think I need to refresh a query that has null matches
-      queryList.reset([]);
-    } else {
+    if (tQuery.matches !== null) {
       // TODO: code duplication with query refresh
       const result = tQuery.crossesNgTemplate ?
           collectQueryResults(tView, lView, queryIndex, []) :
