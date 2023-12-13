@@ -113,7 +113,7 @@ describe('queries as signals', () => {
     it('view children - HAND GENERATED CODE - delete after compiler is done', () => {
       const _c0 = ['el'];
       class AppComponent {
-        divEls = viewChildren('el');
+        divEls = viewChildren<ElementRef<HTMLDivElement>>('el');
         foundEl = computed(() => this.divEls().length);
 
         static ɵfac = () => new AppComponent();

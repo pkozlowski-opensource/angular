@@ -19,6 +19,7 @@ import {QueryList} from '../linker/query_list';
 import {createTemplateRef, TemplateRef as ViewEngine_TemplateRef} from '../linker/template_ref';
 import {createContainerRef, ViewContainerRef} from '../linker/view_container_ref';
 import {assertDefined, assertIndexInRange, assertNumber, throwError} from '../util/assert';
+import {EMPTY_ARRAY} from '../util/empty';
 import {stringify} from '../util/stringify';
 
 import {assertFirstCreatePass, assertLContainer} from './assert';
@@ -424,10 +425,10 @@ function collectQueryResults<T>(tView: TView, lView: LView, queryIndex: number, 
 // TODO: we don't need to refresh signal-based queries but still need to call something that would
 // advance currentQueryIndex...
 export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
-  const lView = getLView();
   const queryIndex = getCurrentQueryIndex();
-
   setCurrentQueryIndex(queryIndex + 1);
+
+  const lView = getLView();
   const tView = lView[TVIEW];
   const tQuery = getTQuery(tView, queryIndex);
 
@@ -471,7 +472,7 @@ export function ɵɵviewQuery<T>(
  *
  * @codeGenApi
  */
-// TODO: should have special signature for the query signal type?
+// TODO: should have special signature for the query signal type (target argument)?
 export function ɵɵviewQueryAsSignal<T>(
     target: Signal<T>, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
     read?: ProviderToken<unknown>): void {
@@ -537,7 +538,6 @@ export function createQuerySignalFn<V>(firstOnly: boolean, required: boolean) {
 
     if (firstOnly) {
       const firstValue = node._queryList?.first
-      // TODO: exact semantics of "required" - is it "just" disallowing undefined?
       if (firstValue === undefined && required) {
         // TODO: add error code
         // TODO: add proper message
@@ -545,9 +545,8 @@ export function createQuerySignalFn<V>(firstOnly: boolean, required: boolean) {
       }
       return firstValue;
     } else {
-      // TODO(perf): make sure that I'm not creating new arrays when returning results (both the one
-      // with results as well as the empty array)
-      return node._queryList?.toArray() ?? [];
+      // TODO(perf): make sure that I'm not creating new arrays when returning results
+      return node._queryList?.toArray() ?? EMPTY_ARRAY;
     }
   }
   (signalFn as any)[SIGNAL] = node;
@@ -638,6 +637,8 @@ function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
 }
 
 function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags): number {
+  // TODO: we might not need the QueryList at all for signal-based queries (which would be
+  // nice win for the code size!)
   const queryList = new QueryList<T>(
       (flags & QueryFlags.emitDistinctChangesOnly) === QueryFlags.emitDistinctChangesOnly);
 
@@ -671,22 +672,21 @@ function getTQuery(tView: TView, index: number): TQuery {
 // TODO: some code duplication with queryRefresh
 function refreshSignalQuery(lView: LView<unknown>, queryIndex: number): boolean {
   const queryList = loadQueryInternal<unknown>(lView, queryIndex);
+  const tView = lView[TVIEW];
+  const tQuery = getTQuery(tView, queryIndex);
 
-  // TODO: we might not need the QueryList at all for signal-based queries (which would be
-  // nice win for the code size!)
-  if (queryList.dirty) {
-    const tView = lView[TVIEW];
-    const tQuery = getTQuery(tView, queryIndex);
-    if (tQuery.matches !== null) {
-      // TODO: code duplication with query refresh
-      const result = tQuery.crossesNgTemplate ?
-          collectQueryResults(tView, lView, queryIndex, []) :
-          materializeViewResults(tView, lView, tQuery, queryIndex);
-      // TODO: test to write - doesn't dirty reactive node if there were no actual changes in the
-      // query matches
-      queryList.reset(result, unwrapElementRef);
-    }
-    return true;
+  // TODO: operation of refreshing a signal query could be invoked during the first creation pass,
+  // while results are still being collected; we should NOT mark such query as "clean" as we might
+  // not have any view add / remove operations that would make it dirty again. Leaning towards
+  // exiting early for calls to refreshSignalQuery before the first creation pass finished
+  if (queryList.dirty && tQuery.matches !== null) {
+    const result = tQuery.crossesNgTemplate ?
+        collectQueryResults(tView, lView, queryIndex, []) :
+        materializeViewResults(tView, lView, tQuery, queryIndex);
+    // TODO: test to write - doesn't dirty reactive node if there were no actual changes in the
+    // query matches (currently reset determines if the query was actually changed but I might need
+    // to move this logic around)
+    return queryList.reset(result, unwrapElementRef);
   }
   return false;
 }

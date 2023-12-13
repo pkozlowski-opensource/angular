@@ -46,7 +46,6 @@ function symbolIterator<T>(this: QueryList<T>): Iterator<T> {
 export class QueryList<T> implements Iterable<T> {
   public readonly dirty: boolean = true;
   private _results: Array<T> = [];
-  // TODO: can be a separate commit
   private _onDirty?: () => void;
   private _changesDetected: boolean = false;
   private _changes: EventEmitter<QueryList<T>>|undefined = undefined;
@@ -156,7 +155,7 @@ export class QueryList<T> implements Iterable<T> {
    *    function) to detect if the lists are different. If the function is not provided, elements
    *    are compared as is (without any pre-processing).
    */
-  reset(resultsTree: Array<T|any[]>, identityAccessor?: (value: T) => unknown): void {
+  reset(resultsTree: Array<T|any[]>, identityAccessor?: (value: T) => unknown): boolean {
     (this as {dirty: boolean}).dirty = false;
     const newResultFlat = flatten(resultsTree);
     if (this._changesDetected = !arrayEquals(this._results, newResultFlat, identityAccessor)) {
@@ -165,6 +164,9 @@ export class QueryList<T> implements Iterable<T> {
       (this as Writable<this>).last = newResultFlat[this.length - 1];
       (this as Writable<this>).first = newResultFlat[0];
     }
+    // THINK: returning value is a potentially breaking change for people who override QueryList.
+    // Can we prevent it?
+    return this._changesDetected;
   }
 
   /**
@@ -175,7 +177,7 @@ export class QueryList<T> implements Iterable<T> {
       this._changes.emit(this);
   }
 
-  /** internal */
+  /** @internal */
   onDirty(cb: () => void) {
     this._onDirty = cb;
   }

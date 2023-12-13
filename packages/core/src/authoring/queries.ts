@@ -13,8 +13,6 @@ import {Signal} from '../render3/reactivity/api';
 // THINK: discuss with Paul the location of those special functions (packages/core/src/authoring/)
 // and schema for naming files under this folder
 
-// THINK: do we need to support the Function signature in the predicate? Is this to support forward
-// refs? Do we have a better type signature for the forwardRef functions?
 function viewChildFn<V>(selector: ProviderToken<V>|string): Signal<V|undefined>;
 function viewChildFn<V, T>(
     selector: ProviderToken<T>|string, opts: {read: ProviderToken<V>}): Signal<V|undefined>;
