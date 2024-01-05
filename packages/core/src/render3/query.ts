@@ -422,8 +422,6 @@ function collectQueryResults<T>(tView: TView, lView: LView, queryIndex: number, 
  *
  * @codeGenApi
  */
-// TODO: we don't need to refresh signal-based queries but still need to call something that would
-// advance currentQueryIndex...
 export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
   const queryIndex = getCurrentQueryIndex();
   setCurrentQueryIndex(queryIndex + 1);
@@ -445,6 +443,22 @@ export function ɵɵqueryRefresh(queryList: QueryList<any>): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Advances the current query index by a specified offset.
+ *
+ * Adjusting the current query index is necessary in cases where a given directive has a mix of
+ * zone-based and signal-based queries. The signal-based queries don't require tracking of the
+ * current index (those are refreshed on demand and not during change detection) so this instruction
+ * is only necessary for backward-compatibility.
+ *
+ * @param index offset to apply to the current query index (defaults to 1)
+ *
+ * @codeGenApi
+ */
+export function ɵɵqueryAdvance(indexOffset: number = 1): void {
+  setCurrentQueryIndex(getCurrentQueryIndex() + indexOffset);
 }
 
 /**
