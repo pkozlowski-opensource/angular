@@ -480,15 +480,14 @@ export function ɵɵviewQuery<T>(
  * target signal.
  *
  * @param target The target signal to assign the query results to.
- * @param predicate The type for which the query will search
+ * @param predicate The type or label that should match a given query
  * @param flags Flags associated with the query
  * @param read What to save in the query
  *
  * @codeGenApi
  */
-// TODO: should have special signature for the query signal type (target argument)?
-export function ɵɵviewQueryAsSignal<T>(
-    target: Signal<T>, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
+export function ɵɵviewQuerySignal(
+    target: Signal<unknown>, predicate: ProviderToken<unknown>|string[], flags: QueryFlags,
     read?: ProviderToken<unknown>): void {
   bindQueryToSignal(target, createViewQuery(predicate, flags, read));
 }
@@ -506,7 +505,7 @@ function createViewQuery<T>(
   return createLQuery<T>(tView, getLView(), flags);
 }
 
-// TODO: organize code - it all shouldn't be in one file...
+// TODO(refactor): organize code - it all shouldn't be in one file...
 export interface QuerySignalNode<T> extends ReactiveNode {
   _lView?: LView;
   _queryIndex?: number;
@@ -568,7 +567,7 @@ export function createQuerySignalFn<V>(firstOnly: boolean, required: boolean) {
   return signalFn;
 }
 
-function bindQueryToSignal<T>(target: Signal<T>, queryIndex: number): void {
+function bindQueryToSignal(target: Signal<unknown>, queryIndex: number): void {
   const node = target[SIGNAL] as QuerySignalNode<unknown>;
   node._lView = getLView();
   node._queryIndex = queryIndex;
@@ -611,7 +610,7 @@ export function ɵɵcontentQuery<T>(
  *
  * @codeGenApi
  */
-export function ɵɵcontentQueryAsSignal<T>(
+export function ɵɵcontentQuerySignal<T>(
     target: Signal<T>, directiveIndex: number, predicate: ProviderToken<unknown>|string[],
     flags: QueryFlags, read?: any): void {
   bindQueryToSignal(target, createContentQuery(directiveIndex, predicate, flags, read));
@@ -651,7 +650,7 @@ function loadQueryInternal<T>(lView: LView, queryIndex: number): QueryList<T> {
 }
 
 function createLQuery<T>(tView: TView, lView: LView, flags: QueryFlags): number {
-  // TODO: we might not need the QueryList at all for signal-based queries (which would be
+  // TODO(perf): we might not need the QueryList at all for signal-based queries (which would be
   // nice win for the code size!)
   const queryList = new QueryList<T>(
       (flags & QueryFlags.emitDistinctChangesOnly) === QueryFlags.emitDistinctChangesOnly);
@@ -683,23 +682,23 @@ function getTQuery(tView: TView, index: number): TQuery {
   return tView.queries!.getByIndex(index);
 }
 
-// TODO: some code duplication with queryRefresh
+// TODO(refactor): some code duplication with queryRefresh
 function refreshSignalQuery(lView: LView<unknown>, queryIndex: number): boolean {
   const queryList = loadQueryInternal<unknown>(lView, queryIndex);
   const tView = lView[TVIEW];
   const tQuery = getTQuery(tView, queryIndex);
 
-  // TODO: operation of refreshing a signal query could be invoked during the first creation pass,
-  // while results are still being collected; we should NOT mark such query as "clean" as we might
-  // not have any view add / remove operations that would make it dirty again. Leaning towards
-  // exiting early for calls to refreshSignalQuery before the first creation pass finished
+  // TODO(test): operation of refreshing a signal query could be invoked during the first
+  // creation pass, while results are still being collected; we should NOT mark such query as
+  // "clean" as we might not have any view add / remove operations that would make it dirty again.
+  // Leaning towards exiting early for calls to refreshSignalQuery before the first creation pass
+  // finished
   if (queryList.dirty && tQuery.matches !== null) {
     const result = tQuery.crossesNgTemplate ?
         collectQueryResults(tView, lView, queryIndex, []) :
         materializeViewResults(tView, lView, tQuery, queryIndex);
-    // TODO: test to write - doesn't dirty reactive node if there were no actual changes in the
-    // query matches (currently reset determines if the query was actually changed but I might need
-    // to move this logic around)
+    // TODO(test): don't mark signal as dirty when a query was marked as dirty but there
+    // was no actual change
     return queryList.reset(result, unwrapElementRef);
   }
   return false;

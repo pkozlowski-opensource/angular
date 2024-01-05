@@ -9,7 +9,7 @@
 // TODO: update imports
 import {computed, ElementRef, ɵɵdefineComponent, ɵɵelement, ɵɵStandaloneFeature} from '@angular/core';
 import {viewChild, viewChildren} from '@angular/core/src/authoring/queries';
-import {ɵɵviewQueryAsSignal} from '@angular/core/src/render3/query';
+import {ɵɵviewQuerySignal} from '@angular/core/src/render3/query';
 import {TestBed} from '@angular/core/testing';
 
 describe('queries as signals', () => {
@@ -26,9 +26,8 @@ describe('queries as signals', () => {
           selectors: [['test-cmp']],
           viewQuery:
               function App_Query(rf, ctx) {
-                // TODO: there should be no update mode for queries any more
                 if (rf & 1) {
-                  ɵɵviewQueryAsSignal(ctx.divEl, _c0, 1);
+                  ɵɵviewQuerySignal(ctx.divEl, _c0, 1);
                 }
               },
           standalone: true,
@@ -73,9 +72,8 @@ describe('queries as signals', () => {
           selectors: [['test-cmp']],
           viewQuery:
               function App_Query(rf, ctx) {
-                // TODO: there should be no update mode for queries any more
                 if (rf & 1) {
-                  ɵɵviewQueryAsSignal(ctx.divEl, _c0, 1);
+                  ɵɵviewQuerySignal(ctx.divEl, _c0, 1);
                 }
               },
           standalone: true,
@@ -122,9 +120,8 @@ describe('queries as signals', () => {
           selectors: [['test-cmp']],
           viewQuery:
               function App_Query(rf, ctx) {
-                // TODO: there should be no update mode for queries any more?
                 if (rf & 1) {
-                  ɵɵviewQueryAsSignal(ctx.divEls, _c0, 1);
+                  ɵɵviewQuerySignal(ctx.divEls, _c0, 1);
                 }
               },
           standalone: true,
@@ -147,7 +144,6 @@ describe('queries as signals', () => {
       // with signal based queries we _do_ have query results after the creation mode execution
       // (before the change detection runs) so we can return those early on! In this sense all
       // queries behave as "static" (?)
-      // TODO: explore more if we need the "static" flag at all in the new system
       expect(fixture.componentInstance.foundEl()).toBe(1);
 
       fixture.detectChanges();
@@ -162,5 +158,11 @@ describe('queries as signals', () => {
     // - content queries - it is just that tests are a bit more tricky
     // - mix of signal and non-signal queries - this is where we are going to see the issue with the
     // "current query index"
+    // - inheritance
+    //    - mix of different types of queries
+    //    - sub and super class having different opinion on the query type (signal vs zone)
+    // - perf: minimal refresh even if a query is marked as dirty
+    //    - content of the list not changing
+    //    - first element not changing (even if the entire matches list did)
   });
 });
