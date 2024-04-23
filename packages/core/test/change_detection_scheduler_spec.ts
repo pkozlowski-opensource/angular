@@ -17,7 +17,6 @@ import {BehaviorSubject, firstValueFrom} from 'rxjs';
 import {filter, take, tap} from 'rxjs/operators';
 
 import {RuntimeError, RuntimeErrorCode} from '../src/errors';
-import {handleError} from '../src/render3/instructions/shared';
 import {scheduleCallbackWithRafRace} from '../src/util/callback_scheduler';
 import {global} from '../src/util/global';
 
@@ -592,6 +591,31 @@ describe('Angular with zoneless enabled', () => {
     await new Promise<void>(resolve => scheduleCallbackWithRafRace(resolve));
     expect(fixture.nativeElement.innerText).toContain('new');
   });
+
+  it('should coalesces microtasks that are registered with experimentalPendingTask into a single paint',
+     async () => {
+       @Component({
+         template: '{{thing}}',
+         standalone: true,
+       })
+       class App {
+         cdr = inject(ChangeDetectorRef);
+         thing = 'initial';
+
+         ngAfterViewChecked() {
+           queueMicrotask(() => {
+             queueMicrotask(() => {
+               this.thing = 'new';
+               this.cdr.markForCheck();
+             });
+           });
+         }
+       }
+
+       const fixture = TestBed.createComponent(App);
+       await new Promise<void>(resolve => scheduleCallbackWithRafRace(resolve));
+       expect(fixture.nativeElement.innerText).toContain('new');
+     });
 
   it('throws a nice error when notifications prevent exiting the event loop (infinite CD)',
      async () => {
