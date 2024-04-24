@@ -4,6 +4,7 @@
 
 ```ts
 
+import { BehaviorSubject } from 'rxjs';
 import { Observable } from 'rxjs';
 import { SIGNAL } from '@angular/core/primitives/signals';
 import { SignalNode } from '@angular/core/primitives/signals';
@@ -674,16 +675,10 @@ export interface ExistingSansProvider {
 }
 
 // @public
-export type ExperimentalPendingTaskHandle = {
-    __brand: 'experimentalPendingTask';
-};
-
-// @public
-export abstract class ExperimentalPendingTasks {
+export class ExperimentalPendingTasks {
+    add(): () => void;
     // (undocumented)
-    abstract add(): ExperimentalPendingTaskHandle;
-    // (undocumented)
-    abstract remove(task: ExperimentalPendingTaskHandle): void;
+    internalPendingTasks: ɵPendingTasks;
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<ExperimentalPendingTasks, never>;
     // (undocumented)
