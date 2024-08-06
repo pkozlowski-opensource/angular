@@ -182,7 +182,24 @@ export function processHostBindingOpCodes(tView: TView, lView: LView): void {
         const hostBindingFn = hostBindingOpCodes[++i] as HostBindingsFunction<any>;
         setBindingRootForHostBindings(bindingRootIndx, directiveIdx);
         const context = lView[directiveIdx];
+
+        const startTime = performance.now();
+
         hostBindingFn(RenderFlags.Update, context);
+
+        performance.measure(hostBindingFn.name, {
+          start: startTime,
+          end: performance.now(),
+
+          detail: {
+            devtools: {
+              color: 'secondary-light',
+              track: 'Angular',
+              properties: [['Description', 'This is a host bindings block']],
+              tooltipText: 'Template host bindings of ' + hostBindingFn.name,
+            },
+          },
+        });
       }
     }
   } finally {

@@ -95,7 +95,22 @@ export function renderView<T>(tView: TView, lView: LView<T>, context: T): void {
     // defined for the root component views.
     const templateFn = tView.template;
     if (templateFn !== null) {
+      const startTime = performance.now();
+
       executeTemplate<T>(tView, lView, templateFn, RenderFlags.Create, context);
+
+      performance.measure(templateFn.name + '_Create', {
+        start: startTime,
+        end: performance.now(),
+        detail: {
+          devtools: {
+            color: 'secondary-light',
+            track: 'Angular',
+            properties: [['Description', 'This is a template creation block']],
+            tooltipText: 'Template rendering of ' + templateFn.name,
+          },
+        },
+      });
     }
 
     // This needs to be set before children are processed to support recursive components.

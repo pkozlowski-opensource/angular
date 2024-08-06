@@ -238,7 +238,22 @@ export function refreshView<T>(
 
     setBindingIndex(tView.bindingStartIndex);
     if (templateFn !== null) {
+      const startTime = performance.now();
+
       executeTemplate(tView, lView, templateFn, RenderFlags.Update, context);
+
+      performance.measure(templateFn.name + '_Update', {
+        start: startTime,
+        end: performance.now(),
+        detail: {
+          devtools: {
+            color: 'secondary-light',
+            track: 'Angular',
+            properties: [['Description', 'Template refresh (update mode)  of ' + templateFn.name]],
+            tooltipText: 'Template refresh of ' + templateFn.name,
+          },
+        },
+      });
     }
 
     const hooksInitPhaseCompleted =

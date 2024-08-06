@@ -37,6 +37,7 @@ export function internalCreateApplication(config: {
   appProviders?: Array<Provider | EnvironmentProviders>;
   platformProviders?: Provider[];
 }): Promise<ApplicationRef> {
+  const startTime = performance.now();
   try {
     const {rootComponent, appProviders, platformProviders} = config;
 
@@ -69,5 +70,17 @@ export function internalCreateApplication(config: {
     });
   } catch (e) {
     return Promise.reject(e);
+  } finally {
+    performance.measure('Bootstrap application', {
+      start: startTime,
+      end: performance.now(),
+      detail: {
+        devtools: {
+          color: 'primary',
+          track: 'Angular',
+          properties: [['Description', 'Bootstrap application']],
+        },
+      },
+    });
   }
 }

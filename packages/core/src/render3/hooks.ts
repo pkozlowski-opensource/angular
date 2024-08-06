@@ -286,11 +286,24 @@ function callHooks(
 function callHookInternal(directive: any, hook: () => void) {
   profiler(ProfilerEvent.LifecycleHookStart, directive, hook);
   const prevConsumer = setActiveConsumer(null);
+  const startTime = performance.now();
   try {
     hook.call(directive);
   } finally {
     setActiveConsumer(prevConsumer);
     profiler(ProfilerEvent.LifecycleHookEnd, directive, hook);
+    performance.measure(hook.name + '_Hook', {
+      start: startTime,
+      end: performance.now(),
+      detail: {
+        devtools: {
+          color: 'secondary-dark',
+          track: 'Angular',
+          properties: [['Description', 'Lifecycle hook ' + hook.name]],
+          tooltipText: 'Lifecycle hook ' + hook.name,
+        },
+      },
+    });
   }
 }
 

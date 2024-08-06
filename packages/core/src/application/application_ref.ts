@@ -480,6 +480,8 @@ export class ApplicationRef {
     componentOrFactory: ComponentFactory<C> | Type<C>,
     rootSelectorOrNode?: string | any,
   ): ComponentRef<C> {
+    const startTime = performance.now();
+
     (typeof ngDevMode === 'undefined' || ngDevMode) && this.warnIfDestroyed();
     const isComponentFactory = componentOrFactory instanceof ComponentFactory;
     const initStatus = this._injector.get(ApplicationInitStatus);
@@ -525,6 +527,19 @@ export class ApplicationRef {
       const _console = this._injector.get(Console);
       _console.log(`Angular is running in development mode.`);
     }
+
+    performance.measure('Bootstrap component', {
+      start: startTime,
+      end: performance.now(),
+      detail: {
+        devtools: {
+          color: 'primary',
+          track: 'Angular',
+          properties: [['Description', 'Bootstrap component']],
+        },
+      },
+    });
+
     return compRef;
   }
 
@@ -539,30 +554,13 @@ export class ApplicationRef {
    * detection pass during which all change detection must complete.
    */
   tick(): void {
-    const startTime = performance.now();
-
     this._tick(true);
-
-    performance.measure('Change detection', {
-      start: startTime,
-      end: performance.now(),
-      detail: {
-        devtools: {
-          metadata: {
-            extensionName: 'Angular DevTools',
-            dataType: 'track-entry',
-          },
-          color: 'primary',
-          track: 'Angular',
-          detailsPairs: [['Description', 'This is a change detection run']],
-          hintText: 'change detection',
-        },
-      },
-    });
   }
 
   /** @internal */
   _tick(refreshViews: boolean): void {
+    const startTime = performance.now();
+
     (typeof ngDevMode === 'undefined' || ngDevMode) && this.warnIfDestroyed();
     if (this._runningTick) {
       throw new RuntimeError(
@@ -590,6 +588,18 @@ export class ApplicationRef {
       setActiveConsumer(prevConsumer);
       this.afterTick.next();
     }
+
+    performance.measure('Change detection', {
+      start: startTime,
+      end: performance.now(),
+      detail: {
+        devtools: {
+          track: 'Angular',
+          properties: [['Description', 'This is a change detection run']],
+          tooltipText: 'change detection',
+        },
+      },
+    });
   }
 
   private detectChangesInAttachedViews(refreshViews: boolean) {

@@ -737,15 +737,16 @@ export function getNodeInjectable(
     const previousIncludeViewProviders = setIncludeViewProviders(factory.canSeeViewProviders);
     factory.resolving = true;
 
+    const token =
+      (tData[index] as DirectiveDef<unknown> | ComponentDef<unknown>).type || tData[index];
+    const injector = new NodeInjector(tNode, lView);
+
     let prevInjectContext: InjectorProfilerContext | undefined;
     if (ngDevMode) {
       // tData indexes mirror the concrete instances in its corresponding LView.
       // lView[index] here is either the injectable instace itself or a factory,
       // therefore tData[index] is the constructor of that injectable or a
       // definition object that contains the constructor in a `.type` field.
-      const token =
-        (tData[index] as DirectiveDef<unknown> | ComponentDef<unknown>).type || tData[index];
-      const injector = new NodeInjector(tNode, lView);
       prevInjectContext = setInjectorProfilerContext({injector, token});
     }
 
@@ -759,8 +760,23 @@ export function getNodeInjectable(
         true,
         "Because flags do not contain `SkipSelf' we expect this to always succeed.",
       );
+
     try {
+      const startTime = performance.now();
       value = lView[index] = factory.factory(undefined, tData, lView, tNode);
+
+      performance.measure(token.name + '_Instantiate', {
+        start: startTime,
+        end: performance.now(),
+        detail: {
+          devtools: {
+            color: 'tertiary-light',
+            track: 'Angular',
+            properties: [['Description', 'DI instantiation']],
+            tooltipText: 'Instantiation of ' + token.name,
+          },
+        },
+      });
 
       ngDevMode && emitInstanceCreatedByInjectorEvent(value);
 
