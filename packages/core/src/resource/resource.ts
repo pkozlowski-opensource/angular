@@ -71,6 +71,7 @@ export abstract class BaseWritableResource<T> implements WritableResource<T> {
   }
 
   protected abstract maybeCancelLoad(): void;
+  public abstract refresh(): void;
 }
 
 export class WritableResourceImpl<T, R> extends BaseWritableResource<T> {
@@ -88,7 +89,7 @@ export class WritableResourceImpl<T, R> extends BaseWritableResource<T> {
     effect(this.loadEffect.bind(this), {injector});
   }
 
-  refresh(): void {
+  override refresh(): void {
     // No point in restarting an in-progress load.
     const status = untracked(this.status);
     if (status === 'loading' || status === 'refreshing') {

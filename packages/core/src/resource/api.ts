@@ -20,6 +20,7 @@ export interface Resource<T> {
 
 export interface WritableResource<T> extends Resource<T> {
   readonly value: WritableSignal<T | undefined>;
+  refresh(): void;
 }
 
 export type ResourceLoaderParams<R> = {
