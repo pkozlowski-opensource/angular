@@ -12,7 +12,6 @@ import {
   inject,
   OnInit,
   PLATFORM_ID,
-  Signal,
   viewChild,
 } from '@angular/core';
 import {isPlatformBrowser} from '@angular/common';

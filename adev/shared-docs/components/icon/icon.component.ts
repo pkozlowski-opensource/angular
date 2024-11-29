@@ -21,7 +21,7 @@ import {
   templateUrl: './icon.component.html',
   styleUrl: './icon.component.scss',
   host: {
-    '[class]': 'MATERIAL_SYMBOLS_OUTLINED',
+    'class': 'material-symbols-outlined',
     '[style.font-size.px]': 'fontSize()',
     'aria-hidden': 'true',
     'translate': 'no',
@@ -32,8 +32,6 @@ export class IconComponent {
   fontSize = computed(() => {
     return IconComponent.isFontLoaded() ? null : 0;
   });
-
-  protected readonly MATERIAL_SYMBOLS_OUTLINED = 'material-symbols-outlined';
 
   private static isFontLoaded = signal(false);
   /** Share the same promise across different instances of the component */

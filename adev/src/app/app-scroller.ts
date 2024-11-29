@@ -22,6 +22,7 @@ export class AppScroller {
   private readonly viewportScroller = inject(ViewportScroller);
   private readonly appRef = inject(ApplicationRef);
   private readonly injector = inject(EnvironmentInjector);
+
   disableScrolling = false;
   private _lastScrollEvent?: Scroll;
   private canScroll = false;

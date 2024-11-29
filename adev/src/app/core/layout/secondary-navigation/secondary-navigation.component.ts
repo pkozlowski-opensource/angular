@@ -117,7 +117,7 @@ export class SecondaryNavigation implements OnInit {
   }
 
   private setActiveRouteOnNavigationEnd(): void {
-    this.urlAfterRedirects$.subscribe((url) => {
+    this.urlAfterRedirects$.pipe(distinctUntilChanged()).subscribe((url) => {
       const activeNavigationItem = this.getActiveNavigationItem(url);
       if (
         activeNavigationItem?.level &&

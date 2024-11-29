@@ -64,10 +64,10 @@ export class TableOfContentsLoader {
   }
 
   private getHeadingTitle(heading: HTMLHeadingElement): string {
-    const div: HTMLDivElement = this.document.createElement('div');
-    div.innerHTML = heading.innerHTML;
+    // const div: HTMLDivElement = this.document.createElement('div');
+    // div.innerHTML = heading.innerHTML;
 
-    return (div.textContent || '').trim();
+    return (heading.textContent || '').trim();
   }
 
   // Get all headings (h2 and h3) with ids, which are not children of the

@@ -42,7 +42,7 @@ export class CustomErrorHandler implements ErrorHandler {
     console.error(error);
   }
 
-  openErrorSnackBar(): void {
+  private openErrorSnackBar(): void {
     this.snackBar
       .openFromComponent(ErrorSnackBar, {
         panelClass: 'docs-invert-mode',
