@@ -18,6 +18,7 @@ import {assertDefined, assertEqual, assertIndexInRange} from '../util/assert';
 import {noSideEffects} from '../util/closure';
 
 import {assertDirectiveDef, assertNodeInjector, assertTNodeForLView} from './assert';
+import {measureCodeInstantiate} from './debug/dev_tools_performance';
 import {
   emitInstanceCreatedByInjectorEvent,
   InjectorProfilerContext,
@@ -517,6 +518,7 @@ function lookupTokenUsingNodeInjector<T>(
       let value: unknown;
 
       if (ngDevMode) {
+        const startTime = performance.now();
         runInInjectorProfilerContext(
           new NodeInjector(getCurrentTNode() as TElementNode, getLView()),
           token as Type<T>,
@@ -528,8 +530,11 @@ function lookupTokenUsingNodeInjector<T>(
             }
           },
         );
+        measureCodeInstantiate(token, startTime);
       } else {
+        const startTime = performance.now();
         value = bloomHash(flags);
+        measureCodeInstantiate(token, startTime);
       }
 
       if (value == null && !(flags & InjectFlags.Optional)) {
@@ -737,15 +742,16 @@ export function getNodeInjectable(
     const previousIncludeViewProviders = setIncludeViewProviders(factory.canSeeViewProviders);
     factory.resolving = true;
 
+    const token =
+      (tData[index] as DirectiveDef<unknown> | ComponentDef<unknown>).type || tData[index];
+    const injector = new NodeInjector(tNode, lView);
+
     let prevInjectContext: InjectorProfilerContext | undefined;
     if (ngDevMode) {
       // tData indexes mirror the concrete instances in its corresponding LView.
       // lView[index] here is either the injectable instace itself or a factory,
       // therefore tData[index] is the constructor of that injectable or a
       // definition object that contains the constructor in a `.type` field.
-      const token =
-        (tData[index] as DirectiveDef<unknown> | ComponentDef<unknown>).type || tData[index];
-      const injector = new NodeInjector(tNode, lView);
       prevInjectContext = setInjectorProfilerContext({injector, token});
     }
 
@@ -759,8 +765,11 @@ export function getNodeInjectable(
         true,
         "Because flags do not contain `SkipSelf' we expect this to always succeed.",
       );
+
     try {
+      const startTime = performance.now();
       value = lView[index] = factory.factory(undefined, tData, lView, tNode);
+      measureCodeInstantiate(token, startTime);
 
       ngDevMode && emitInstanceCreatedByInjectorEvent(value);
 
