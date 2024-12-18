@@ -47,6 +47,8 @@ import {NgZone} from '../zone/ng_zone';
 import {ApplicationInitStatus} from './application_init';
 import {TracingAction, TracingService, TracingSnapshot} from './tracing';
 import {EffectScheduler} from '../render3/reactivity/root_effect_scheduler';
+import {ProfilerEvent} from '../render3/profiler_types';
+import {profiler} from '../render3/profiler';
 
 /**
  * A DI token that provides a set of callbacks to
@@ -306,7 +308,7 @@ export class ApplicationRef {
   private _destroyListeners: Array<() => void> = [];
   /** @internal */
   _views: InternalViewRef<unknown>[] = [];
-  private readonly internalErrorHandler = inject(INTERNAL_APPLICATION_ERROR_HANDLER);
+  private readonly internalErrorHandler = inject(Injector);
   private readonly afterRenderManager = inject(AfterRenderManager);
   private readonly zonelessEnabled = inject(ZONELESS_ENABLED);
   private readonly rootEffectScheduler = inject(EffectScheduler);
@@ -531,6 +533,8 @@ export class ApplicationRef {
     componentOrFactory: ComponentFactory<C> | Type<C>,
     rootSelectorOrNode?: string | any,
   ): ComponentRef<C> {
+    profiler(ProfilerEvent.BootstrapComponentStart, null);
+
     (typeof ngDevMode === 'undefined' || ngDevMode) && this.warnIfDestroyed();
     const isComponentFactory = componentOrFactory instanceof ComponentFactory;
     const initStatus = this._injector.get(ApplicationInitStatus);
@@ -576,6 +580,9 @@ export class ApplicationRef {
       const _console = this._injector.get(Console);
       _console.log(`Angular is running in development mode.`);
     }
+
+    profiler(ProfilerEvent.BootstrapComponentEnd, compRef);
+
     return compRef;
   }
 
@@ -593,11 +600,15 @@ export class ApplicationRef {
     if (!this.zonelessEnabled) {
       this.dirtyFlags |= ApplicationRefDirtyFlags.ViewTreeGlobal;
     }
-    this._tick();
+
+    // Run `_tick()` in the context of the most recent snapshot, if one exists.
+    this.tracingSnapshot?.run(TracingAction.CHANGE_DETECTION, this._tick) ?? this._tick();
   }
 
   /** @internal */
   _tick = (): void => {
+    profiler(ProfilerEvent.ChangeDetectionStart, null);
+
     if (this.tracingSnapshot !== null) {
       const snapshot = this.tracingSnapshot;
       this.tracingSnapshot = null;
@@ -622,7 +633,6 @@ export class ApplicationRef {
     try {
       this._runningTick = true;
       this.synchronize();
-
       if (typeof ngDevMode === 'undefined' || ngDevMode) {
         for (let view of this.allViews) {
           view.checkNoChanges();
@@ -630,11 +640,14 @@ export class ApplicationRef {
       }
     } catch (e) {
       // Attention: Don't rethrow as it could cancel subscriptions to Observables!
-      this.internalErrorHandler(e);
+      const internalErrorHandler = this.injector.get(INTERNAL_APPLICATION_ERROR_HANDLER);
+      internalErrorHandler(e);
     } finally {
       this._runningTick = false;
       setActiveConsumer(prevConsumer);
       this.afterTick.next();
+
+      profiler(ProfilerEvent.ChangeDetectionEnd, null);
     }
   };
 
@@ -653,7 +666,9 @@ export class ApplicationRef {
 
     let runs = 0;
     while (this.dirtyFlags !== ApplicationRefDirtyFlags.None && runs++ < MAXIMUM_REFRESH_RERUNS) {
+      profiler(ProfilerEvent.ChangeDetectionSyncStart, null);
       this.synchronizeOnce();
+      profiler(ProfilerEvent.ChangeDetectionSyncEnd, null);
     }
 
     if ((typeof ngDevMode === 'undefined' || ngDevMode) && runs >= MAXIMUM_REFRESH_RERUNS) {

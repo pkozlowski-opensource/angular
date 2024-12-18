@@ -17,12 +17,16 @@ import {
 } from '../../change_detection/scheduling/zoneless_scheduling';
 import {type DestroyRef} from '../../linker/destroy_ref';
 import {TracingAction, TracingService, TracingSnapshot} from '../../application/tracing';
+import {profiler} from '../profiler';
+import {ProfilerEvent} from '../profiler_types';
 
 export class AfterRenderManager {
   impl: AfterRenderImpl | null = null;
 
   execute(): void {
+    profiler(ProfilerEvent.AfterRenderHooksStart, null);
     this.impl?.execute();
+    profiler(ProfilerEvent.AfterRenderHooksEnd, null);
   }
 
   /** @nocollapse */
@@ -74,10 +78,12 @@ export class AfterRenderImpl {
 
         try {
           sequence.pipelinedValue = this.ngZone.runOutsideAngular(() =>
-            this.maybeTrace(
-              () => sequence.hooks[phase]!(sequence.pipelinedValue),
-              sequence.snapshot,
-            ),
+            this.maybeTrace(() => {
+              const hookFn = sequence.hooks[phase]!;
+              profiler(ProfilerEvent.LifecycleHookStart, null, hookFn);
+              hookFn(sequence.pipelinedValue);
+              profiler(ProfilerEvent.LifecycleHookEnd, null, hookFn);
+            }, sequence.snapshot),
           );
         } catch (err) {
           sequence.erroredOrDestroyed = true;

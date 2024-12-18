@@ -56,6 +56,8 @@ import {
   getTDeferBlockDetails,
   getTemplateIndexForState,
 } from './utils';
+import {profiler} from '../render3/profiler';
+import {ProfilerEvent} from '../render3/profiler_types';
 
 /**
  * **INTERNAL**, avoid referencing it in application code.
@@ -241,6 +243,8 @@ function applyDeferBlockState(
   tNode: TNode,
   hostLView: LView<unknown>,
 ) {
+  profiler(ProfilerEvent.DeferBlockStateStart, null);
+
   const stateTmplIndex = getTemplateIndexForState(newState, hostLView, tNode);
 
   if (stateTmplIndex !== null) {
@@ -304,6 +308,8 @@ function applyDeferBlockState(
       lDetails[ON_COMPLETE_FNS] = null;
     }
   }
+
+  profiler(ProfilerEvent.DeferBlockStateEnd, null);
 }
 
 /**
