@@ -15,6 +15,9 @@ import {TestBed} from '@angular/core/testing';
 import {
   ChangeDetectionStrategy,
   Component,
+  createComponent,
+  ElementRef,
+  EnvironmentInjector,
   Injector,
   Input,
   NgModuleRef,
@@ -465,6 +468,46 @@ describe('ComponentFactory', () => {
       fixture.componentInstance.setInput('2');
       fixture.detectChanges();
       expect(fixture.nativeElement.innerText).toBe('2');
+    });
+  });
+
+  describe('non-regression', () => {
+    it('should preserve static classes and styles on a provided host element', () => {
+      @Component({
+        selector: 'dynamic-cmp',
+        template: '',
+        host: {
+          class: 'dynamic',
+          style: 'width: 100%;',
+        },
+      })
+      class DynamicCmp {}
+
+      @Component({
+        selector: 'test-cmp',
+        template: `
+          <div #hostForDynamic class="host" style="height: 100%"></div>
+        `,
+      })
+      class TestCmp {
+        @ViewChild('hostForDynamic', {static: true}) hostEl?: ElementRef<HTMLDivElement>;
+
+        constructor(private _envInjector: EnvironmentInjector) {}
+
+        createDynamic() {
+          const cmpRef = createComponent(DynamicCmp, {
+            hostElement: this.hostEl?.nativeElement,
+            environmentInjector: this._envInjector,
+          });
+
+          return cmpRef;
+        }
+      }
+
+      const fixture = TestBed.createComponent(TestCmp);
+      const dynamicCmptRef = fixture.componentInstance.createDynamic();
+      const hostNativeNode = dynamicCmptRef.location.nativeElement;
+      expect(hostNativeNode.className).toBe('host dynamic');
     });
   });
 });
