@@ -73,6 +73,7 @@ import {
 import {ProviderToken} from './provider_token';
 import {INJECTOR_SCOPE, InjectorScope} from './scope';
 import {setActiveConsumer} from '@angular/core/primitives/signals';
+import {measureCodeInstantiate} from '../render3/debug/dev_tools_performance';
 
 /**
  * Marker which indicates that a value has not yet been created from the factory function.
@@ -474,13 +475,20 @@ export class R3Injector extends EnvironmentInjector {
       } else if (record.value === NOT_YET) {
         record.value = CIRCULAR;
 
+        // TODO: code duplication - I should have universal plugin point for the profiling info
         if (ngDevMode) {
+          const startTime = performance.now();
           runInInjectorProfilerContext(this, token as Type<T>, () => {
             record.value = record.factory!();
             emitInstanceCreatedByInjectorEvent(record.value);
           });
+          // TODO: type-cast here is incorrect, we can get anything from the injector
+          measureCodeInstantiate(token, startTime);
         } else {
+          const startTime = performance.now();
           record.value = record.factory!();
+          // TODO: type-cast here is incorrect, we can get anything from the injector
+          measureCodeInstantiate(token, startTime);
         }
       }
       if (typeof record.value === 'object' && record.value && hasOnDestroy(record.value)) {
